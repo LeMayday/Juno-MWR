@@ -29,18 +29,6 @@ def download_file(url: str, fname: str):
         return None
 
 
-def change_version(item):
-    # from Gemini
-    # Case A: If the cell contains a list (e.g., a list of URLs or names)
-    if isinstance(item, list):
-        return [str(i).replace('_V03', '_V04').replace('_v03', '_v04') for i in item]
-    # Case B: If the cell is just a single standalone string
-    if isinstance(item, str):
-        return item.replace('_V03', '_V04').replace('_v03', '_v04')
-    # Case C: If the cell is empty/NaN, leave it alone
-    return item
-
-
 def PDS_query(t_min: datetime, t_max) -> pd.DataFrame:
     # query PDS and return time-sorted DataFrame of filenames with desired information
     client = pep.PDSRegistryClient()
@@ -59,7 +47,7 @@ def PDS_query(t_min: datetime, t_max) -> pd.DataFrame:
     PDS_data_df = PDS_data_df.rename(columns={file_ref_lbl: 'urls', file_name_lbl: 'filenames'})
     # replace _V03 with _V04 (for some reason, peppi doesn't grab newest data version)
     cols = ['urls', 'filenames']
-    PDS_data_df[cols] = PDS_data_df[cols].map(change_version)
+    PDS_data_df[cols] = PDS_data_df[cols].map(lambda item: [str(i).replace('_V03', '_V04') for i in item])
     return download_clean_data(PDS_data_df)
 
 
