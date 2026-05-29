@@ -3,11 +3,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pds.peppi as pep
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 import requests
 import os
 
 data_dir = os.path.join('.', 'data')
+
+def get_PJ_time(pj: int) -> datetime:
+    df = pd.read_table('perijove_times.txt')
+    return datetime.strptime(df["Time (UTC/SCET)"].iloc[pj], "%Y-%m-%d %H:%M:%S.%f")
+
 
 def find_file(filename: str):
     for root, _, files in os.walk(data_dir):
@@ -29,7 +34,7 @@ def download_file(url: str, fname: str):
         return None
 
 
-def PDS_query(t_min: datetime, t_max) -> pd.DataFrame:
+def PDS_query(t_min: datetime, t_max: datetime) -> pd.DataFrame:
     # query PDS and return time-sorted DataFrame of filenames with desired information
     client = pep.PDSRegistryClient()
     products = pep.Products(client) \
@@ -105,13 +110,15 @@ def load_data(data_dir: str):
 
 
 def main():
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument("-d", "--data-dir", required=True, type=str, help="Data Directory")
-    # args = parser.parse_args()
     os.makedirs(data_dir, exist_ok=True)
-
-    t_min = datetime.strptime("2016-08-27 10:50:44.060", "%Y-%m-%d %H:%M:%S.%f")
-    t_max = datetime.strptime("2016-08-27 14:50:44.060", "%Y-%m-%d %H:%M:%S.%f")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--PJ", required=True, type=int, help="Perijove")
+    parser.add_argument("--dt", required=True, type=int, help="Delta time in minutes")
+    args = parser.parse_args()
+    pj_time = get_PJ_time(args.PJ)
+    pj_dt = timedelta(minutes=args.dt)
+    t_min = pj_time - pj_dt
+    t_max = pj_time + pj_dt
     PDS_query(t_min, t_max)
 
     # load_data(args.data_dir)
