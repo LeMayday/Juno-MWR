@@ -6,30 +6,40 @@ from datetime import datetime, timedelta
 import os
 from PDS_helper import data_dir, PDS_query
 
+CHANNELS = np.array(['R1_1TA', 'R2_1TA', 'R3TA', 'R4TA', 'R5TA', 'R6TA'])
+
 
 def get_PJ_time(pj: int) -> datetime:
     df = pd.read_table('perijove_times.txt')
     return datetime.strptime(df["Time (UTC/SCET)"].iloc[pj], "%Y-%m-%d %H:%M:%S.%f")
 
 
-def load_data(data_dir: str):
-    data = pd.read_csv(data_dir)
-    data_ch1 = data["R1_1TA"].to_numpy()[::10]
-    data_utc = data["t_utc_doy"].to_numpy()[::10]
+def load_PJ_data(filepaths_df: pd.DataFrame, t_min: datetime, t_max: datetime, chs: np.ndarray) -> pd.DataFrame:
+    dfs = []
+    keep_cols = ['t_utc_doy', *CHANNELS[chs - 1].tolist()]
+    for IRDR_path in filepaths_df['IRDR_CSV']:
+        IRDR_data = pd.read_csv(IRDR_path, usecols=keep_cols)  # filter by desired channels
+        IRDR_data['t_utc_doy'] = pd.to_datetime(IRDR_data['t_utc_doy'], format="%Y-%jT%H:%M:%S.%f")
+        time_mask = (IRDR_data['t_utc_doy'] >= t_min) & (IRDR_data['t_utc_doy'] <= t_max)
+        IRDR_data_filtered = IRDR_data[time_mask]
+        IRDR_data_downsampled = IRDR_data_filtered.iloc[::10]
+        dfs.append(IRDR_data_downsampled)
+    IRDR_data_pj = pd.concat(dfs, ignore_index=True)
+    IRDR_data_pj = IRDR_data_pj.rename(columns={'t_utc_doy': 'Time'})
+    IRDR_data_pj = IRDR_data_pj.rename(columns={str(CHANNELS[ch - 1]): f"Ch{ch}" for ch in chs})
+    return IRDR_data_pj
 
-    ref_str = "2016-08-27 12:50:44.060"
 
-    ref_dt = pd.to_datetime(ref_str, format="%Y-%m-%d %H:%M:%S.%f")
-    data_utc_df = pd.to_datetime(data["t_utc_doy"], format="%Y-%jT%H:%M:%S.%f")
-
-    minutes_deltas = (data_utc_df - ref_dt).dt.total_seconds() / 60
-    minutes_deltas = minutes_deltas.to_numpy()[::10]
-
-    minutes = minutes_deltas[np.logical_and(minutes_deltas > -10, minutes_deltas < 10)]
-    data_ch1 = data_ch1[np.logical_and(minutes_deltas > -10, minutes_deltas < 10)]
+def time_series_plot(pj: int, IRDR_data_pj: pd.DataFrame):
+    pj_time = get_PJ_time(pj)
+    IRDR_data_pj_dt = IRDR_data_pj
+    IRDR_data_pj_dt['Time'] = IRDR_data_pj_dt['Time'].apply(lambda t: (t - pj_time).seconds / 60)
+    minutes_delta = IRDR_data_pj_dt["Time"].to_numpy()
 
     fig, ax = plt.subplots(1, 1)
-    ax.plot(minutes, data_ch1)
+    for ch in IRDR_data_pj_dt.columns[1:]:  # skip time column
+        ax.plot(minutes_delta, IRDR_data_pj_dt[ch].to_numpy(), label=ch)
+    ax.legend()
     plt.show()
 
 
@@ -43,9 +53,10 @@ def main():
     pj_dt = timedelta(minutes=args.dt)
     t_min = pj_time - pj_dt
     t_max = pj_time + pj_dt
-    PDS_query(t_min, t_max)
-
-    # load_data(args.data_dir)
+    filepaths_df = PDS_query(t_min, t_max)
+    chs = [1]
+    IRDR_data_pj = load_PJ_data(filepaths_df, t_min, t_max, np.array(chs))
+    time_series_plot(args.PJ, IRDR_data_pj)
 
 if __name__ == "__main__":
     main()
