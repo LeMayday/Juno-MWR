@@ -53,7 +53,7 @@ def PDS_query(t_min: datetime, t_max) -> pd.DataFrame:
 
 def download_data(PDS_data_df: pd.DataFrame) -> pd.DataFrame:
     IRDR_list = []
-    GRDR_list = []
+    # GRDR_list = []
     for url_list, fname_list in zip(PDS_data_df['urls'], PDS_data_df['filenames']):
         for url, fname in zip(url_list, fname_list):
             if ".LBL" in fname: # skip LBL files
@@ -65,11 +65,12 @@ def download_data(PDS_data_df: pd.DataFrame) -> pd.DataFrame:
                 fpath = download_file(url, fname)
             if "RI" in fname:
                 IRDR_list.append(fpath)
-            elif "RG" in fname:
-                GRDR_list.append(fpath)
+            # elif "RG" in fname:
+            #     GRDR_list.append(fpath)
     IRDR_list.sort()
-    GRDR_list.sort()
-    return pd.DataFrame({'IRDR_CSV': IRDR_list, 'GRDR_CSV': GRDR_list})
+    # GRDR_list.sort()
+    # return pd.DataFrame({'IRDR_CSV': IRDR_list, 'GRDR_CSV': GRDR_list})
+    return pd.DataFrame({'IRDR_CSV': IRDR_list})
 
 
 def download_clean_data(PDS_data_df) -> pd.DataFrame:
