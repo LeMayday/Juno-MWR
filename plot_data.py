@@ -57,13 +57,16 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--PJ", required=True, type=int, help="Perijove")
     parser.add_argument("--dt", required=True, type=int, help="Delta time in minutes")
+    parser.add_argument("--ch", required=True, type=str, help='List of channels separated by comma')
     args = parser.parse_args()
+    chs = [int(ch) for ch in args.ch.split(',')]
+    # validate channel inputs
+    for ch in chs: assert ch in range(1, 7), "Valid channel numbers are 1-6"
     pj_time = get_PJ_time(args.PJ)
     pj_dt = timedelta(minutes=args.dt)
     t_min = pj_time - pj_dt
     t_max = pj_time + pj_dt
     filepaths_df = PDS_query(t_min, t_max)
-    chs = [1]
     IRDR_data_pj = load_PJ_data(filepaths_df, t_min, t_max, np.array(chs))
     time_series_plot(args.PJ, IRDR_data_pj)
 
