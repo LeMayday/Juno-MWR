@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from astropy.time import Time
 import argparse
 from datetime import datetime, timedelta
 import os
@@ -14,9 +15,16 @@ def get_PJ_time(pj: int) -> datetime:
     return datetime.strptime(df["Time (UTC/SCET)"].iloc[pj], "%Y-%m-%d %H:%M:%S.%f")
 
 
+def get_PJ_time_ET(pj: int) -> np.float64:
+    # https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/req/time.html#In%20the%20Toolkit%20ET%20Means%20TDB
+    t = Time(get_PJ_time(pj), scale='utc')
+    j2000 = Time('2000-01-01T12:00:00', scale='tt')
+    return (t - j2000).sec
+
+
 def load_PJ_data(filepaths_df: pd.DataFrame, t_min: datetime, t_max: datetime, chs: np.ndarray) -> pd.DataFrame:
     dfs = []
-    keep_cols = ['t_utc_doy', *CHANNELS[chs - 1].tolist()]
+    keep_cols = ['t_ephem_time', 't_utc_doy', *CHANNELS[chs - 1].tolist()]
     for IRDR_path in filepaths_df['IRDR_CSV']:
         IRDR_data = pd.read_csv(IRDR_path, usecols=keep_cols)  # filter by desired channels
         IRDR_data['t_utc_doy'] = pd.to_datetime(IRDR_data['t_utc_doy'], format="%Y-%jT%H:%M:%S.%f")
@@ -25,21 +33,22 @@ def load_PJ_data(filepaths_df: pd.DataFrame, t_min: datetime, t_max: datetime, c
         IRDR_data_downsampled = IRDR_data_filtered.iloc[::10]
         dfs.append(IRDR_data_downsampled)
     IRDR_data_pj = pd.concat(dfs, ignore_index=True)
-    IRDR_data_pj = IRDR_data_pj.rename(columns={'t_utc_doy': 'Time'})
+    IRDR_data_pj = IRDR_data_pj.rename(columns={'t_ephem_time': 'Time_ET', 't_utc_doy': 'Time_UTC'})
     IRDR_data_pj = IRDR_data_pj.rename(columns={str(CHANNELS[ch - 1]): f"Ch{ch}" for ch in chs})
     return IRDR_data_pj
 
 
 def time_series_plot(pj: int, IRDR_data_pj: pd.DataFrame):
-    pj_time = get_PJ_time(pj)
-    IRDR_data_pj_dt = IRDR_data_pj
-    IRDR_data_pj_dt['Time'] = IRDR_data_pj_dt['Time'].apply(lambda t: (t - pj_time).seconds / 60)
-    minutes_delta = IRDR_data_pj_dt["Time"].to_numpy()
+    pj_time = get_PJ_time_ET(pj)
+    minutes_delta = (IRDR_data_pj['Time_ET'].to_numpy() - pj_time) / 60
 
     fig, ax = plt.subplots(1, 1)
-    for ch in IRDR_data_pj_dt.columns[1:]:  # skip time column
-        ax.plot(minutes_delta, IRDR_data_pj_dt[ch].to_numpy(), label=ch)
+    fig.set_size_inches(12, 8)
+    for ch in IRDR_data_pj.columns[2:]:  # skip time column
+        ax.plot(minutes_delta, IRDR_data_pj[ch].to_numpy(), label=ch)
     ax.legend()
+    ax.axvline(x=0, ls='--', c='k')
+    fig.tight_layout()
     plt.show()
 
 
