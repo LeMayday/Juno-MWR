@@ -66,7 +66,7 @@ def make_subplots(fig: Figure, num_chs: int) -> List[Axes]:
     nrows = 2
     ncols = (num_chs + 1) // 2  # return 2 if 3 or 4, 3 if 5 or 6
     if num_chs % 2 == 0:
-        axes = [fig.add_subplot(nrows, ncols, ch) for ch in num_chs]
+        axes = [fig.add_subplot(nrows, ncols, ch) for ch in range(1, num_chs + 1)]
     else:
         axes = []
         for ch in range(1, num_chs + 1):
