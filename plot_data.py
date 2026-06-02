@@ -33,8 +33,7 @@ def load_PJ_data(filepaths_df: pd.DataFrame, t_min: datetime, t_max: datetime, c
         IRDR_data['t_utc_doy'] = pd.to_datetime(IRDR_data['t_utc_doy'], format="%Y-%jT%H:%M:%S.%f")
         time_mask = (IRDR_data['t_utc_doy'] >= t_min) & (IRDR_data['t_utc_doy'] <= t_max)
         IRDR_data_filtered = IRDR_data[time_mask]
-        IRDR_data_downsampled = IRDR_data_filtered.iloc[::10]   # downsampled to 1/s
-        dfs.append(IRDR_data_downsampled)
+        dfs.append(IRDR_data_filtered)
     IRDR_data_pj = pd.concat(dfs, ignore_index=True)
     IRDR_data_pj = IRDR_data_pj.rename(columns={'t_ephem_time': 'Time_ET', 't_utc_doy': 'Time_UTC'})
     IRDR_data_pj = IRDR_data_pj.rename(columns={str(CHANNELS[ch - 1]): f"Ch{ch}" for ch in chs})
@@ -60,6 +59,7 @@ def make_subplots(fig: Figure, num_chs: int) -> List[Axes]:
 
 
 def time_series_plot(pj: int, IRDR_data_pj: pd.DataFrame):
+    IRDR_data_pj = IRDR_data_pj.iloc[::10]  # downsampled to 1/s
     pj_time = get_PJ_time_ET(pj)
     minutes_delta = (IRDR_data_pj['Time_ET'].to_numpy() - pj_time) / 60
 
