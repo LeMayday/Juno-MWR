@@ -92,7 +92,7 @@ def main():
     os.makedirs(data_dir, exist_ok=True)
     parser = argparse.ArgumentParser()
     parser.add_argument("--PJ", required=True, type=int, help="Perijove")
-    parser.add_argument("--dt", required=True, type=int, help="Delta time in minutes")
+    parser.add_argument("--dt", required=True, type=float, help="Delta time in minutes")
     parser.add_argument("--ch", required=True, type=str, help='List of channels separated by comma')
     args = parser.parse_args()
     chs = [int(ch) for ch in args.ch.split(',')]
