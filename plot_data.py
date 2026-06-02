@@ -42,7 +42,7 @@ def load_PJ_data(filepaths_df: pd.DataFrame, t_min: datetime, t_max: datetime, c
 
 def make_subplots(fig: Figure, num_chs: int) -> List[Axes]:
     if num_chs <= 2:
-        axes = [fig.add_subplot(1, num_chs, ch) for ch in num_chs]
+        axes = [fig.add_subplot(1, num_chs, ch) for ch in range(1, num_chs + 1)]
         return axes
     nrows = 2
     ncols = (num_chs + 1) // 2  # return 2 if 3 or 4, 3 if 5 or 6
@@ -74,12 +74,13 @@ def time_series_plot(pj: int, IRDR_data_pj: pd.DataFrame):
 
 
 def banana_plot(IRDR_data_pj: pd.DataFrame):
+    samples_per_rot = 307   # 30.7 s/rot Santos-Costa+2017, 1 sample per 100 ms
     fig = plt.figure(figsize=(12,8))
     axes = make_subplots(fig, len(IRDR_data_pj.columns[2:]))
     for i, ch in enumerate(IRDR_data_pj.columns[2:]):   # skip time columns
         data = IRDR_data_pj[ch].to_numpy()
-        data = data[:((data.size // 30)*30)]    # 30 sec/rot, need to truncate data to integer # of rotations
-        data_folded = data.reshape(-1, 30)
+        data = data[:((data.size // samples_per_rot)*samples_per_rot)]    # need to truncate data to integer # of rotations
+        data_folded = data.reshape(-1, samples_per_rot)
         im = axes[i].imshow(data_folded, cmap='gist_ncar', aspect='auto')
         fig.colorbar(im, ax=axes[i])
         axes[i].invert_yaxis()
