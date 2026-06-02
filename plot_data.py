@@ -40,6 +40,25 @@ def load_PJ_data(filepaths_df: pd.DataFrame, t_min: datetime, t_max: datetime, c
     return IRDR_data_pj
 
 
+def fill_missing_data(IRDR_data_pj: pd.DataFrame) -> pd.DataFrame:
+    # MWR_SIS specifies that every 6th sample is skipped when returning data in full data mode
+    # Unfortunately, visual inspection reveals that data rate is not perfectly 100 ms
+    dt = 0.1                                                # samples taken every 100 ms
+    time = IRDR_data_pj['Time_ET'].to_numpy()
+    time_diff = np.diff(time)                               # difference between sequential elements (N-1)
+    # here I assume that time is always increasing and missing time is never >~0.2 (1 missing sample)
+    missing = time_diff > dt * 1.75                         # mask where difference is at least ~2*dt (line up with indices after which should be inserted new value)
+    missing_places = np.nonzero(missing)[0] + 1             # indices before which should be inserted new value
+    missing_values = np.around(time[:-1][missing] + dt, 3)  # GPT suggests rounding to avoid floating point errors
+    time_full = np.insert(time, missing_places, missing_values)
+    IRDR_data_pj = IRDR_data_pj.set_index('Time_ET')
+    IRDR_data_pj_full = IRDR_data_pj.reindex(time_full)
+    for col in IRDR_data_pj.columns:
+        IRDR_data_pj_full[col] = IRDR_data_pj_full[col].interpolate(method='linear')
+    IRDR_data_pj_full = IRDR_data_pj_full.reset_index()
+    return IRDR_data_pj_full
+
+
 def make_subplots(fig: Figure, num_chs: int) -> List[Axes]:
     if num_chs <= 2:
         axes = [fig.add_subplot(1, num_chs, ch) for ch in range(1, num_chs + 1)]
@@ -74,6 +93,7 @@ def time_series_plot(pj: int, IRDR_data_pj: pd.DataFrame):
 
 
 def banana_plot(IRDR_data_pj: pd.DataFrame):
+    IRDR_data_pj = fill_missing_data(IRDR_data_pj)
     samples_per_rot = 307   # 30.7 s/rot Santos-Costa+2017, 1 sample per 100 ms
     fig = plt.figure(figsize=(12,8))
     axes = make_subplots(fig, len(IRDR_data_pj.columns[2:]))
