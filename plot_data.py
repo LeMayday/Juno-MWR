@@ -1,11 +1,14 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 from astropy.time import Time
 import argparse
 from datetime import datetime, timedelta
 import os
 from PDS_helper import data_dir, PDS_query
+from typing import List
 
 CHANNELS = np.array(['R1_1TA', 'R2_1TA', 'R3TA', 'R4TA', 'R5TA', 'R6TA'])
 
@@ -30,7 +33,7 @@ def load_PJ_data(filepaths_df: pd.DataFrame, t_min: datetime, t_max: datetime, c
         IRDR_data['t_utc_doy'] = pd.to_datetime(IRDR_data['t_utc_doy'], format="%Y-%jT%H:%M:%S.%f")
         time_mask = (IRDR_data['t_utc_doy'] >= t_min) & (IRDR_data['t_utc_doy'] <= t_max)
         IRDR_data_filtered = IRDR_data[time_mask]
-        IRDR_data_downsampled = IRDR_data_filtered.iloc[::10]
+        IRDR_data_downsampled = IRDR_data_filtered.iloc[::10]   # downsampled to 1/s
         dfs.append(IRDR_data_downsampled)
     IRDR_data_pj = pd.concat(dfs, ignore_index=True)
     IRDR_data_pj = IRDR_data_pj.rename(columns={'t_ephem_time': 'Time_ET', 't_utc_doy': 'Time_UTC'})
@@ -38,16 +41,48 @@ def load_PJ_data(filepaths_df: pd.DataFrame, t_min: datetime, t_max: datetime, c
     return IRDR_data_pj
 
 
+def make_subplots(fig: Figure, num_chs: int) -> List[Axes]:
+    if num_chs <= 2:
+        axes = [fig.add_subplot(1, num_chs, ch) for ch in num_chs]
+        return axes
+    nrows = 2
+    ncols = (num_chs + 1) // 2  # return 2 if 3 or 4, 3 if 5 or 6
+    if num_chs % 2 == 0:
+        axes = [fig.add_subplot(nrows, ncols, ch) for ch in num_chs]
+    else:
+        axes = []
+        for ch in range(1, num_chs + 1):
+            if ch <= ncols: # top row
+                axes.append(fig.add_subplot(nrows, ncols * 2, (2 * ch - 1, 2 * ch)))
+            else:           # bottom row
+                axes.append(fig.add_subplot(nrows, ncols * 2, (2 * ch, 2 * ch + 1)))
+    return axes
+
+
 def time_series_plot(pj: int, IRDR_data_pj: pd.DataFrame):
     pj_time = get_PJ_time_ET(pj)
     minutes_delta = (IRDR_data_pj['Time_ET'].to_numpy() - pj_time) / 60
 
-    fig, ax = plt.subplots(1, 1)
-    fig.set_size_inches(12, 8)
-    for ch in IRDR_data_pj.columns[2:]:  # skip time column
-        ax.plot(minutes_delta, IRDR_data_pj[ch].to_numpy(), label=ch)
-    ax.legend()
-    ax.axvline(x=0, ls='--', c='k')
+    fig = plt.figure(figsize=(12,8))
+    axes = make_subplots(fig, len(IRDR_data_pj.columns[2:]))
+    for i, ch in enumerate(IRDR_data_pj.columns[2:]):   # skip time column
+        axes[i].plot(minutes_delta, IRDR_data_pj[ch].to_numpy(), label=ch)
+        axes[i].axvline(x=0, ls='--', c='k')
+        axes[i].set_title(ch)
+    fig.tight_layout()
+    plt.show()
+
+
+def banana_plot(IRDR_data_pj: pd.DataFrame):
+    fig = plt.figure(figsize=(12,8))
+    axes = make_subplots(fig, len(IRDR_data_pj.columns[2:]))
+    for i, ch in enumerate(IRDR_data_pj.columns[2:]):   # skip time columns
+        data = IRDR_data_pj[ch].to_numpy()
+        data = data[:((data.size // 30)*30)]    # 30 sec/rot, need to truncate data to integer # of rotations
+        data_folded = data.reshape(-1, 30)
+        im = axes[i].imshow(data_folded, cmap='gist_ncar', aspect='auto')
+        fig.colorbar(im, ax=axes[i])
+        axes[i].invert_yaxis()
     fig.tight_layout()
     plt.show()
 
@@ -69,6 +104,8 @@ def main():
     filepaths_df = PDS_query(t_min, t_max)
     IRDR_data_pj = load_PJ_data(filepaths_df, t_min, t_max, np.array(chs))
     time_series_plot(args.PJ, IRDR_data_pj)
+    banana_plot(IRDR_data_pj)
+
 
 if __name__ == "__main__":
     main()
