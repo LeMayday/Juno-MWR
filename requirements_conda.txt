@@ -8,6 +8,8 @@ annotated-doc=0.0.4=pypi_0
 annotated-types=0.7.0=pypi_0
 anyio=4.13.0=pypi_0
 aom=3.13.2=h664349e_0
+astropy=7.2.0=py313h44c8d7b_0
+astropy-iers-data=0.2026.3.16.0.53.33=py313h06a4308_0
 attrs=26.1.0=pypi_0
 authlib=1.7.2=pypi_0
 beartype=0.22.9=pypi_0
@@ -76,6 +78,8 @@ libexpat=2.8.1=h7354ed3_0
 libffi=3.4.8=hc5d346e_2
 libgcc=15.2.0=h69a1729_8
 libgcc-ng=15.2.0=h166f726_8
+libgfortran=15.2.0=h166f726_8
+libgfortran5=15.2.0=hc633d37_8
 libgl=1.7.0=h5eee18b_2
 libglib=2.86.3=h8b17d9a_0
 libglvnd=1.7.0=h5eee18b_2
@@ -116,6 +120,7 @@ mkl_random=1.3.0=py313h23c847b_0
 more-itertools=11.1.0=pypi_0
 mysql-common=9.3.0=h9e076cb_6
 mysql-libs=9.3.0=he5ffe59_6
+narwhals=2.7.0=py313h06a4308_0
 ncurses=6.5=h7934f7d_0
 numpy=2.4.4=py313h08c6c3d_1
 numpy-base=2.4.4=py313h00548fb_1
@@ -143,6 +148,7 @@ pydantic=2.13.4=pypi_0
 pydantic-core=2.46.4=pypi_0
 pydantic-settings=2.14.1=pypi_0
 pydocket=0.21.0=pypi_0
+pyerfa=2.0.1.5=py313hfdf79b4_1
 pygments=2.20.0=pypi_0
 pyjwt=2.13.0=pypi_0
 pyparsing=3.2.5=py313h06a4308_0
@@ -157,7 +163,7 @@ python-json-logger=4.1.0=pypi_0
 python-multipart=0.0.29=pypi_0
 python_abi=3.13=3_cp313
 pytz=2026.2=pypi_0
-pyyaml=6.0.3=pypi_0
+pyyaml=6.0.3=py313h591646f_0
 qtbase=6.11.0=h9201cad_0
 qtdeclarative=6.11.0=h69798bf_0
 qtsvg=6.11.0=h6af1df9_0
@@ -173,6 +179,7 @@ requests=2.33.1=py313h06a4308_0
 rich=15.0.0=pypi_0
 rich-rst=2.0.1=pypi_0
 rpds-py=2026.5.1=pypi_0
+scipy=1.17.1=py313h804029f_1
 secretstorage=3.5.0=pypi_0
 setuptools=82.0.1=py313h06a4308_0
 shellingham=1.5.4=pypi_0
@@ -217,5 +224,6 @@ xorg-libxshmfence=1.3.3=h9b100fa_0
 xorg-libxxf86vm=1.1.6=h9b100fa_0
 xorg-xorgproto=2024.1=h5eee18b_1
 xz=5.8.2=h448239c_0
+yaml=0.2.5=h7b6447c_0
 zlib=1.3.1=h47b2149_1
 zstd=1.5.7=h11fc155_0
