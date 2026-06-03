@@ -8,7 +8,7 @@ import argparse
 from datetime import datetime, timedelta
 import os
 from PDS_helper import DATA_DIR, CHANNELS, COLS_GRDR, PDS_query
-from typing import List
+from coordinates import lat_longE, lat_longW
 
 
 def get_PJ_time(pj: int) -> datetime:
@@ -23,7 +23,7 @@ def get_PJ_time_ET(pj: int) -> np.float64:
     return (t - j2000).sec
 
 
-def load_PJ_data(filepaths_df: pd.DataFrame, t_min: datetime, t_max: datetime, chs: np.ndarray) -> pd.DataFrame:
+def load_PJ_data(filepaths_df: pd.DataFrame, t_min: datetime, t_max: datetime, chs: np.ndarray) -> tuple[pd.DataFrame, pd.DataFrame]:
     dfs = [[], []]
     keep_cols_IRDR = ['t_ephem_time', 't_utc_doy', *CHANNELS[chs - 1].tolist()]
     keep_cols_GRDR = []
@@ -47,7 +47,7 @@ def load_PJ_data(filepaths_df: pd.DataFrame, t_min: datetime, t_max: datetime, c
     IRDR_data_pj = IRDR_data_pj.rename(columns={'t_ephem_time': 'Time_ET', 't_utc_doy': 'Time_UTC'})
     GRDR_data_pj = GRDR_data_pj.rename(columns={'t_ephem_time': 'Time_ET', 't_utc_doy': 'Time_UTC'})
     IRDR_data_pj = IRDR_data_pj.rename(columns={str(CHANNELS[ch - 1]): f"Ch{ch}" for ch in chs})
-    return IRDR_data_pj
+    return IRDR_data_pj, GRDR_data_pj
 
 
 def fill_missing_data(data: pd.DataFrame) -> pd.DataFrame:
@@ -69,7 +69,7 @@ def fill_missing_data(data: pd.DataFrame) -> pd.DataFrame:
     return data_full
 
 
-def make_subplots(fig: Figure, num_chs: int) -> List[Axes]:
+def make_subplots(fig: Figure, num_chs: int) -> list[Axes]:
     if num_chs <= 2:
         axes = [fig.add_subplot(1, num_chs, ch) for ch in range(1, num_chs + 1)]
         return axes
@@ -87,7 +87,7 @@ def make_subplots(fig: Figure, num_chs: int) -> List[Axes]:
     return axes
 
 
-def time_series_plot(pj: int, IRDR_data_pj: pd.DataFrame):
+def time_series_plot(IRDR_data_pj: pd.DataFrame, pj: int):
     IRDR_data_pj = IRDR_data_pj.iloc[::10]  # downsampled to 1/s
     pj_time = get_PJ_time_ET(pj)
     minutes_delta = (IRDR_data_pj['Time_ET'].to_numpy() - pj_time) / 60
@@ -102,20 +102,48 @@ def time_series_plot(pj: int, IRDR_data_pj: pd.DataFrame):
     plt.show()
 
 
-def banana_plot(IRDR_data_pj: pd.DataFrame):
+def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame):
     IRDR_data_pj = fill_missing_data(IRDR_data_pj)
+    GRDR_data_pj = fill_missing_data(GRDR_data_pj)
     samples_per_rot = 307   # 30.7 s/rot Santos-Costa+2017, 1 sample per 100 ms
     fig = plt.figure(figsize=(12,8))
     axes = make_subplots(fig, len(IRDR_data_pj.columns[2:]))
     for i, ch in enumerate(IRDR_data_pj.columns[2:]):   # skip time columns
         data = IRDR_data_pj[ch].to_numpy()
-        data = data[:((data.size // samples_per_rot)*samples_per_rot)]    # need to truncate data to integer # of rotations
+        num_spins = data.size // samples_per_rot
+        data = data[:(num_spins * samples_per_rot)]     # need to truncate data to integer # of rotations
         data_folded = data.reshape(-1, samples_per_rot)
-        im = axes[i].imshow(data_folded, cmap='gist_ncar', aspect='auto')
+        im = axes[i].imshow(data_folded, cmap='gist_ncar', aspect='auto', origin='lower')
         fig.colorbar(im, ax=axes[i])
-        axes[i].invert_yaxis()
+        add_SIII_contours(axes[i], ch[2], GRDR_data_pj, samples_per_rot, num_spins)
     fig.tight_layout()
     plt.show()
+
+
+def add_SIII_contours(ax: Axes, ch: int, GRDR_data_pj: pd.DataFrame, samples_per_rot: int, num_spins: int):
+    columns_to_select = [col for col in COLS_GRDR if 'S3RH' in col and f'B{ch}' in col]      # expect this to be [x,y,z] for given channel
+    data_x, data_y, data_z = np.hsplit(GRDR_data_pj[columns_to_select].to_numpy(), 3)
+    lat, longW = lat_longW(data_x, data_y, data_z)
+    add_contours(ax, lat, longW, samples_per_rot, num_spins)
+
+
+def add_VIP4_contours(ax: Axes, ch: int, GRDR_data_pj: pd.DataFrame, samples_per_rot: int, num_spins: int):
+    columns_to_select = [col for col in COLS_GRDR if 'JMag' in col and f'B{ch}' in col]      # expect this to be [x,y,z] for given channel
+    data_x, data_y, data_z = np.hsplit(GRDR_data_pj[columns_to_select].to_numpy(), 3)
+    lat, longW = lat_longE(data_x, data_y, data_z)
+    add_contours(ax, lat, longW, samples_per_rot, num_spins)
+
+
+def add_contours(ax: Axes, lat: np.ndarray, long: np.ndarray, samples_per_rot: int, num_spins: int):
+    x = np.arange(samples_per_rot)
+    y = np.arange(num_spins)
+    X, Y = np.meshgrid(x, y)    # set up image grid
+    lat_folded = lat[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)           # truncate data
+    long_folded = long[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)
+    lat_contours = ax.contour(X, Y, lat_folded, levels=range(-90, 91, 10), colors='white')
+    ax.clabel(lat_contours, inline=True, fmt='%.0f')
+    long_contours = ax.contour(X, Y, long_folded, levels=range(0, 361, 30), colors='white')
+    ax.clabel(long_contours, inline=True, fmt='%.0f')
 
 
 def main():
@@ -133,9 +161,9 @@ def main():
     t_min = pj_time - pj_dt
     t_max = pj_time + pj_dt
     filepaths_df = PDS_query(t_min, t_max)
-    IRDR_data_pj = load_PJ_data(filepaths_df, t_min, t_max, np.array(chs))
-    time_series_plot(args.PJ, IRDR_data_pj)
-    banana_plot(IRDR_data_pj)
+    IRDR_data_pj, GRDR_data_pj = load_PJ_data(filepaths_df, t_min, t_max, np.array(chs))
+    time_series_plot(IRDR_data_pj, args.PJ)
+    banana_plot(IRDR_data_pj, GRDR_data_pj)
 
 
 if __name__ == "__main__":
