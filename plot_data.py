@@ -7,10 +7,8 @@ from astropy.time import Time
 import argparse
 from datetime import datetime, timedelta
 import os
-from PDS_helper import data_dir, PDS_query
+from PDS_helper import DATA_DIR, CHANNELS, COLS_GRDR, PDS_query
 from typing import List
-
-CHANNELS = np.array(['R1_1TA', 'R2_1TA', 'R3TA', 'R4TA', 'R5TA', 'R6TA'])
 
 
 def get_PJ_time(pj: int) -> datetime:
@@ -26,16 +24,28 @@ def get_PJ_time_ET(pj: int) -> np.float64:
 
 
 def load_PJ_data(filepaths_df: pd.DataFrame, t_min: datetime, t_max: datetime, chs: np.ndarray) -> pd.DataFrame:
-    dfs = []
-    keep_cols = ['t_ephem_time', 't_utc_doy', *CHANNELS[chs - 1].tolist()]
-    for IRDR_path in filepaths_df['IRDR_CSV']:
-        IRDR_data = pd.read_csv(IRDR_path, usecols=keep_cols)  # filter by desired channels
+    dfs = [[], []]
+    keep_cols_IRDR = ['t_ephem_time', 't_utc_doy', *CHANNELS[chs - 1].tolist()]
+    keep_cols_GRDR = []
+    for col in COLS_GRDR:   # 'B' is boresight for channel, keep all non-channel cols and only those channels specified
+        if 'B' not in col: keep_cols_GRDR.append(col)
+        else:
+            for ch in [f'B{ch}' for ch in chs]:
+                if ch in col: keep_cols_GRDR.append(col)
+    for IRDR_path, GRDR_path in zip(filepaths_df['IRDR_CSV'], filepaths_df['GRDR_CSV']):
+        IRDR_data = pd.read_csv(IRDR_path, usecols=keep_cols_IRDR)  # filter by desired channels
+        GRDR_data = pd.read_csv(GRDR_path, usecols=keep_cols_GRDR)
         IRDR_data['t_utc_doy'] = pd.to_datetime(IRDR_data['t_utc_doy'], format="%Y-%jT%H:%M:%S.%f")
+        GRDR_data['t_utc_doy'] = pd.to_datetime(GRDR_data['t_utc_doy'], format="%Y-%jT%H:%M:%S.%f")
         time_mask = (IRDR_data['t_utc_doy'] >= t_min) & (IRDR_data['t_utc_doy'] <= t_max)
         IRDR_data_filtered = IRDR_data[time_mask]
-        dfs.append(IRDR_data_filtered)
-    IRDR_data_pj = pd.concat(dfs, ignore_index=True)
+        GRDR_data_filtered = GRDR_data[time_mask]   # assume sample correspondence btwn IRDR and GRDR
+        dfs[0].append(IRDR_data_filtered)
+        dfs[1].append(GRDR_data_filtered)
+    IRDR_data_pj = pd.concat(dfs[0], ignore_index=True)
+    GRDR_data_pj = pd.concat(dfs[1], ignore_index=True)
     IRDR_data_pj = IRDR_data_pj.rename(columns={'t_ephem_time': 'Time_ET', 't_utc_doy': 'Time_UTC'})
+    GRDR_data_pj = GRDR_data_pj.rename(columns={'t_ephem_time': 'Time_ET', 't_utc_doy': 'Time_UTC'})
     IRDR_data_pj = IRDR_data_pj.rename(columns={str(CHANNELS[ch - 1]): f"Ch{ch}" for ch in chs})
     return IRDR_data_pj
 
@@ -109,7 +119,7 @@ def banana_plot(IRDR_data_pj: pd.DataFrame):
 
 
 def main():
-    os.makedirs(data_dir, exist_ok=True)
+    os.makedirs(DATA_DIR, exist_ok=True)
     parser = argparse.ArgumentParser()
     parser.add_argument("--PJ", required=True, type=int, help="Perijove")
     parser.add_argument("--dt", required=True, type=float, help="Delta time in minutes")
