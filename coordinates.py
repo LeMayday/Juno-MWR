@@ -3,7 +3,7 @@ import numpy as np
 
 def pos_to_angle(x: np.ndarray, y: np.ndarray, z: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     r = np.sqrt(x**2 + y**2)
-    theta = np.acos(z / r)
+    theta = np.acos(z)
     phi = np.atan2(y, x) + np.pi
     return theta, phi
 
