@@ -117,6 +117,7 @@ def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame):
         im = axes[i].imshow(data_folded, cmap='gist_ncar', aspect='auto', origin='lower')
         fig.colorbar(im, ax=axes[i])
         add_SIII_contours(axes[i], ch[2], GRDR_data_pj, samples_per_rot, num_spins)
+        # add_VIP4_contours(axes[i], ch[2], GRDR_data_pj, samples_per_rot, num_spins)
     fig.tight_layout()
     plt.show()
 
@@ -142,7 +143,7 @@ def add_contours(ax: Axes, lat: np.ndarray, long: np.ndarray, samples_per_rot: i
     lat_folded = lat[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)           # truncate data
     long_folded = long[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)
     long_folded = np.rad2deg(unwrap(np.deg2rad(long_folded)))
-    lat_contours = ax.contour(X, Y, lat_folded, levels=range(-90, 91, 10), colors='white', linestyles='solid', negative_linestyles='dotted')
+    lat_contours = ax.contour(X, Y, lat_folded, levels=range(-90, 91, 30), colors='white', linestyles='solid', negative_linestyles='dotted')
     ax.clabel(lat_contours, inline=True, fmt='%.0f')
     long_contours = ax.contour(X, Y, long_folded, levels=range(-360, 720, 30), colors='white', linestyles='dashed') # need to include larger range since data is wrapped
     ax.clabel(long_contours, inline=True, fmt=lambda x: f"{int(round(x)) % 360}")
