@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 import os
 from PDS_helper import DATA_DIR, CHANNELS, COLS_GRDR, PDS_query
 from coordinates import lat_longE, lat_longW
+from unwrap import unwrap
 
 
 def get_PJ_time(pj: int) -> datetime:
@@ -140,10 +141,11 @@ def add_contours(ax: Axes, lat: np.ndarray, long: np.ndarray, samples_per_rot: i
     X, Y = np.meshgrid(x, y)    # set up image grid
     lat_folded = lat[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)           # truncate data
     long_folded = long[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)
-    lat_contours = ax.contour(X, Y, lat_folded, levels=range(-90, 91, 10), colors='white')
+    long_folded = np.rad2deg(unwrap(np.deg2rad(long_folded)))
+    lat_contours = ax.contour(X, Y, lat_folded, levels=range(-90, 91, 10), colors='white', linestyles='solid', negative_linestyles='dotted')
     ax.clabel(lat_contours, inline=True, fmt='%.0f')
-    long_contours = ax.contour(X, Y, long_folded, levels=range(0, 361, 30), colors='white')
-    ax.clabel(long_contours, inline=True, fmt='%.0f')
+    long_contours = ax.contour(X, Y, long_folded, levels=range(-360, 720, 30), colors='white', linestyles='dashed') # need to include larger range since data is wrapped
+    ax.clabel(long_contours, inline=True, fmt=lambda x: f"{int(round(x)) % 360}")
 
 
 def main():
