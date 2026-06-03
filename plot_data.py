@@ -50,23 +50,23 @@ def load_PJ_data(filepaths_df: pd.DataFrame, t_min: datetime, t_max: datetime, c
     return IRDR_data_pj
 
 
-def fill_missing_data(IRDR_data_pj: pd.DataFrame) -> pd.DataFrame:
+def fill_missing_data(data: pd.DataFrame) -> pd.DataFrame:
     # MWR_SIS specifies that every 6th sample is skipped when returning data in full data mode
     # Unfortunately, visual inspection reveals that data rate is not perfectly 100 ms
     dt = 0.1                                                # samples taken every 100 ms
-    time = IRDR_data_pj['Time_ET'].to_numpy()
+    time = data['Time_ET'].to_numpy()
     time_diff = np.diff(time)                               # difference between sequential elements (N-1)
     # here I assume that time is always increasing and missing time is never >~0.2 (1 missing sample)
     missing = time_diff > dt * 1.75                         # mask where difference is at least ~2*dt (line up with indices after which should be inserted new value)
     missing_places = np.nonzero(missing)[0] + 1             # indices before which should be inserted new value
     missing_values = np.around(time[:-1][missing] + dt, 3)  # GPT suggests rounding to avoid floating point errors
     time_full = np.insert(time, missing_places, missing_values)
-    IRDR_data_pj = IRDR_data_pj.set_index('Time_ET')
-    IRDR_data_pj_full = IRDR_data_pj.reindex(time_full)
-    for col in IRDR_data_pj.columns:
-        IRDR_data_pj_full[col] = IRDR_data_pj_full[col].interpolate(method='linear')
-    IRDR_data_pj_full = IRDR_data_pj_full.reset_index()
-    return IRDR_data_pj_full
+    data = data.set_index('Time_ET')
+    data_full = data.reindex(time_full)
+    for col in data.columns:
+        data_full[col] = data_full[col].interpolate(method='linear')
+    data_full = data_full.reset_index()
+    return data_full
 
 
 def make_subplots(fig: Figure, num_chs: int) -> List[Axes]:
