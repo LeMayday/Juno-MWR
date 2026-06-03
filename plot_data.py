@@ -153,7 +153,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--PJ", required=True, type=int, help="Perijove")
     parser.add_argument("--dt", required=True, type=float, help="Delta time in minutes")
-    parser.add_argument("--ch", required=True, type=str, help='List of channels separated by comma')
+    parser.add_argument("--ch", required=False, type=str, default="1,2,3,4,5,6", help="List of channels separated by comma")
     args = parser.parse_args()
     chs = [int(ch) for ch in args.ch.split(',')]
     # validate channel inputs
