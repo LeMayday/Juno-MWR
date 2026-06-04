@@ -56,9 +56,11 @@ def PDS_query(t_min: datetime, t_max: datetime) -> pd.DataFrame:
     # grab file urls and names into dataframe
     file_ref_lbl = 'ops:Data_File_Info.ops:file_ref'
     file_name_lbl = 'ops:Data_File_Info.ops:file_name'
-    cols = [file_ref_lbl, file_name_lbl]
-    PDS_data_df = products.as_dataframe()[cols]
+    PDS_data_df = products.as_dataframe()[[file_ref_lbl, file_name_lbl]]
+    # rename for easier access (this affects other functions!)
+    PDS_data_df = PDS_data_df.rename(columns={file_ref_lbl: 'urls', file_name_lbl: 'filenames'})
     # replace _V03 with _V04 (for some reason, peppi doesn't grab newest data version)
+    cols = ['urls', 'filenames']
     PDS_data_df[cols] = PDS_data_df[cols].map(lambda item: [str(i).replace('_V03', '_V04') for i in item])
     return download_clean_data(PDS_data_df)
 
