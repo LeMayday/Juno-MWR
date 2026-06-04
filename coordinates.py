@@ -43,3 +43,11 @@ def lat_lonW(x: np.ndarray, y: np.ndarray, z: np.ndarray) -> tuple[np.ndarray, n
     lat, lon = lat_lonE(x, y, z)
     lon = 360 - lon
     return lat, lon
+
+
+def lat_lon_to_pos(lat: np.ndarray, lon: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    z = np.sin(np.deg2rad(lat))
+    lon_rad = np.deg2rad(lon)
+    x = np.cos(lon_rad)
+    y = np.sin(lon_rad)
+    return x, y, z

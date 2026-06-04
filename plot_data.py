@@ -8,7 +8,7 @@ from unwrap import unwrap
 
 # local files
 from PDS_helper import DATA_DIR, COLS_GRDR, load_PJ_data, get_SIII_lat_lon, get_VIP4_lat_lon, get_PC_lat_lon
-from coordinates import get_PJ_time_ET, lat_lonE, lat_lonW
+from coordinates import get_PJ_time_ET
 
 # default
 import argparse
