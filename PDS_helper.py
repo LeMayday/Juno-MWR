@@ -6,7 +6,7 @@ import numpy as np
 from datetime import datetime
 import requests
 import os
-from coordinates import get_tmin_tmax
+from coordinates import get_tmin_tmax, lat_lonE, lat_lonW
 
 DATA_DIR = os.path.join('.', 'data')
 COLS_IRDR = ['t_ephem_time', 't_utc_doy', 'R1_1TA', 'R1_2TA', 'R2_1TA', 'R2_2TA', 'R3TA', 'R4TA', 'R5TA', 'R6TA']
@@ -127,3 +127,21 @@ def load_PJ_data(pj: int, dt: float, chs: np.ndarray) -> tuple[pd.DataFrame, pd.
     GRDR_data_pj = GRDR_data_pj.rename(columns={'t_ephem_time': 'Time_ET', 't_utc_doy': 'Time_UTC'})
     IRDR_data_pj = IRDR_data_pj.rename(columns={str(CHANNELS[ch - 1]): f"Ch{ch}" for ch in chs})
     return IRDR_data_pj, GRDR_data_pj
+
+
+def get_SIII_lat_lon(GRDR_data_pj: pd.DataFrame, ch: int) -> tuple[np.ndarray, np.ndarray]:
+    columns_to_select = [col for col in COLS_GRDR if 'S3RH' in col and f'B{ch}' in col]      # expect this to be [x,y,z] for given channel
+    data_x, data_y, data_z = np.hsplit(GRDR_data_pj[columns_to_select].to_numpy(), 3)
+    return lat_lonW(data_x, data_y, data_z)
+
+
+def get_VIP4_lat_lon(GRDR_data_pj: pd.DataFrame, ch: int) -> tuple[np.ndarray, np.ndarray]:
+    columns_to_select = [col for col in COLS_GRDR if 'JMag' in col and f'B{ch}' in col]      # expect this to be [x,y,z] for given channel
+    data_x, data_y, data_z = np.hsplit(GRDR_data_pj[columns_to_select].to_numpy(), 3)
+    return lat_lonE(data_x, data_y, data_z)
+
+
+def get_PC_lat_lon(GRDR_data_pj: pd.DataFrame, ch: int) -> tuple[np.ndarray, np.ndarray]:
+    lat = GRDR_data_pj[f'PC_lat_JsB{ch}'].to_numpy()
+    lon = GRDR_data_pj[f'PC_lon_JsB{ch}'].to_numpy()
+    return lat, lon

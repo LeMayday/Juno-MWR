@@ -1,13 +1,19 @@
+# modules
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
+from unwrap import unwrap
+
+# local files
+from PDS_helper import DATA_DIR, COLS_GRDR, load_PJ_data, get_SIII_lat_lon, get_VIP4_lat_lon, get_PC_lat_lon
+from coordinates import get_PJ_time_ET, lat_lonE, lat_lonW
+
+# default
 import argparse
 import os
-from PDS_helper import DATA_DIR, COLS_GRDR, load_PJ_data
-from coordinates import get_PJ_time_ET, lat_longE, lat_longW
-from unwrap import unwrap
+from typing import Optional
 
 
 def fill_missing_data(data: pd.DataFrame) -> pd.DataFrame:
@@ -32,7 +38,7 @@ def fill_missing_data(data: pd.DataFrame) -> pd.DataFrame:
     return data_full
 
 
-def channel_jupiter_mask(ch: int, GRDR_data_pj: pd.DataFrame, samples_per_rot: int, num_spins: int) -> np.ndarray:
+def channel_jupiter_2Dmask(ch: int, GRDR_data_pj: pd.DataFrame, samples_per_rot: int, num_spins: int) -> np.ndarray:
     # planetocentric lat/long of antenna boresight surface intercept seems to be only provided when antenna is looking at Jupiter
     columns_to_select = [col for col in COLS_GRDR if 'PC_lon_Js' in col and f'B{ch}' in col]
     data = GRDR_data_pj[columns_to_select].to_numpy()
@@ -88,38 +94,52 @@ def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame):
         im = axes[i].imshow(data_folded, cmap='gist_ncar', aspect='auto', origin='lower')
         fig.colorbar(im, ax=axes[i])
         # note ch is "Ch{i}"
-        add_SIII_contours(axes[i], ch[2], GRDR_data_pj, samples_per_rot, num_spins)
-        # add_VIP4_contours(axes[i], ch[2], GRDR_data_pj, samples_per_rot, num_spins)
+        add_contours(axes[i], ch[2], GRDR_data_pj, samples_per_rot, num_spins, type='SIII')
     fig.tight_layout()
     plt.show()
 
 
-def add_SIII_contours(ax: Axes, ch: int, GRDR_data_pj: pd.DataFrame, samples_per_rot: int, num_spins: int):
-    columns_to_select = [col for col in COLS_GRDR if 'S3RH' in col and f'B{ch}' in col]      # expect this to be [x,y,z] for given channel
-    data_x, data_y, data_z = np.hsplit(GRDR_data_pj[columns_to_select].to_numpy(), 3)
-    lat, longW = lat_longW(data_x, data_y, data_z)
-    add_contours(ax, lat, longW, samples_per_rot, num_spins)
+def add_contours(ax: Axes, ch: int, GRDR_data_pj: pd.DataFrame, samples_per_rot: int, num_spins: int, type: Optional[str] = None):
+    # valid types: SIII, SIII_PC, SIII_NJ, VIP4, VIP4_PC, VIP4_NJ, PC
+    if type is None:
+        return
+    bkgd_lat = None; bkgd_lon = None; frgd_lat = None; frgd_lon = None
+    if 'SIII' in type:
+        bkgd_lat, bkgd_lon = get_SIII_lat_lon(GRDR_data_pj, ch)
+    elif 'VIP4' in type:
+        bkgd_lat, bkgd_lon = get_VIP4_lat_lon(GRDR_data_pj, ch)
+    if 'PC' in type:
+        frgd_lat, frgd_lon = get_PC_lat_lon(GRDR_data_pj, ch)
+    # options are bkgd no frgd, bkgd no jupiter, bkgd w frgd, frgd no bkgd
+    if bkgd_lat is not None:
+        bkgd_lat_folded = bkgd_lat[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)     # truncate data
+        bkgd_lon_folded = bkgd_lon[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)
+        bkgd_lon_folded = np.rad2deg(unwrap(np.deg2rad(bkgd_lon_folded)))                           # 2D phase unwraping to ensure continuous contours
+        if frgd_lat or 'NJ' in type:
+            jupiter_mask = channel_jupiter_2Dmask(ch, GRDR_data_pj, samples_per_rot, num_spins)     # could also get this from frgd data?
+            bkgd_lat_folded[jupiter_mask] = np.nan
+            bkgd_lon_folded[jupiter_mask] = np.nan
+        plot_contours(ax, bkgd_lat_folded, bkgd_lon_folded)
+    if frgd_lat is not None:
+        frgd_lat_folded = frgd_lat[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)     # truncate data
+        frgd_lon_folded = frgd_lon[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)
+        frgd_lon_folded_masked = np.ma.masked_invalid(frgd_lon_folded)                              # unwrap also allows masked arrays
+        frgd_lon_folded = np.rad2deg(unwrap(np.deg2rad(frgd_lon_folded_masked)))                    # 2D phase unwraping to ensure continuous contours
+        plot_contours(ax, frgd_lat_folded, frgd_lon_folded)
 
 
-def add_VIP4_contours(ax: Axes, ch: int, GRDR_data_pj: pd.DataFrame, samples_per_rot: int, num_spins: int):
-    columns_to_select = [col for col in COLS_GRDR if 'JMag' in col and f'B{ch}' in col]      # expect this to be [x,y,z] for given channel
-    data_x, data_y, data_z = np.hsplit(GRDR_data_pj[columns_to_select].to_numpy(), 3)
-    lat, longE = lat_longE(data_x, data_y, data_z)
-    add_contours(ax, lat, longE, samples_per_rot, num_spins)
-
-
-def add_contours(ax: Axes, lat: np.ndarray, long: np.ndarray, samples_per_rot: int, num_spins: int):
+def plot_contours(ax: Axes, lat_folded: np.ndarray, lon_folded: np.ndarray):
+    # lat/long are folded, and long is unwrapped
+    assert lat_folded.shape == lon_folded.shape, "Lat / Long are wrong sizes (how did you do this???)"
+    num_spins, samples_per_rot = lat_folded.shape
     x = np.arange(samples_per_rot)
     y = np.arange(num_spins)
     X, Y = np.meshgrid(x, y)    # set up image grid
-    lat_folded = lat[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)           # truncate data
-    long_folded = long[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)
-    long_folded = np.rad2deg(unwrap(np.deg2rad(long_folded)))                               # 2D phase unwraping to ensure continuous contours
     lat_contours = ax.contour(X, Y, lat_folded, levels=range(-90, 91, 30), colors='white', linestyles='solid', negative_linestyles='dotted')
     ax.clabel(lat_contours, inline=True, fmt='%.0f')
     # long contours use levels outside [0, 360) since data is phase unwrapped
-    long_contours = ax.contour(X, Y, long_folded, levels=range(-360, 720, 30), colors='white', linestyles='dashed')
-    ax.clabel(long_contours, inline=True, fmt=lambda x: f"{int(round(x)) % 360}")
+    lon_contours = ax.contour(X, Y, lon_folded, levels=range(-360, 720, 30), colors='white', linestyles='dashed')
+    ax.clabel(lon_contours, inline=True, fmt=lambda x: f"{int(round(x)) % 360}")
 
 
 def main():
