@@ -23,10 +23,22 @@ def fill_missing_data(data: pd.DataFrame) -> pd.DataFrame:
     time_full = np.insert(time, missing_places, missing_values)
     data = data.set_index('Time_ET')
     data_full = data.reindex(time_full)
+    # reindexing causes missing time stamps to have NaN data -- interpolate should fill in
+    # only interpolate inside gaps of 1 (preserve NaN values in PC lat/lon columns)
+    # limitation is if missing time stamp is at the edge of PC data chunk and should have had data
     for col in data.columns:
-        data_full[col] = data_full[col].interpolate(method='linear')
+        data_full[col] = data_full[col].interpolate(method='linear', limit=1, limit_area='inside')
     data_full = data_full.reset_index()
     return data_full
+
+
+def channel_jupiter_mask(ch: int, GRDR_data_pj: pd.DataFrame, samples_per_rot: int, num_spins: int) -> np.ndarray:
+    # planetocentric lat/long of antenna boresight surface intercept seems to be only provided when antenna is looking at Jupiter
+    columns_to_select = [col for col in COLS_GRDR if 'PC_lon_Js' in col and f'B{ch}' in col]
+    data = GRDR_data_pj[columns_to_select].to_numpy()
+    mask = ~np.isnan(data)
+    mask_folded = mask[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)
+    return mask_folded
 
 
 def make_subplots(fig: Figure, num_chs: int) -> list[Axes]:
@@ -75,6 +87,7 @@ def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame):
         data_folded = data.reshape(-1, samples_per_rot)
         im = axes[i].imshow(data_folded, cmap='gist_ncar', aspect='auto', origin='lower')
         fig.colorbar(im, ax=axes[i])
+        # note ch is "Ch{i}"
         add_SIII_contours(axes[i], ch[2], GRDR_data_pj, samples_per_rot, num_spins)
         # add_VIP4_contours(axes[i], ch[2], GRDR_data_pj, samples_per_rot, num_spins)
     fig.tight_layout()
@@ -91,8 +104,8 @@ def add_SIII_contours(ax: Axes, ch: int, GRDR_data_pj: pd.DataFrame, samples_per
 def add_VIP4_contours(ax: Axes, ch: int, GRDR_data_pj: pd.DataFrame, samples_per_rot: int, num_spins: int):
     columns_to_select = [col for col in COLS_GRDR if 'JMag' in col and f'B{ch}' in col]      # expect this to be [x,y,z] for given channel
     data_x, data_y, data_z = np.hsplit(GRDR_data_pj[columns_to_select].to_numpy(), 3)
-    lat, longW = lat_longE(data_x, data_y, data_z)
-    add_contours(ax, lat, longW, samples_per_rot, num_spins)
+    lat, longE = lat_longE(data_x, data_y, data_z)
+    add_contours(ax, lat, longE, samples_per_rot, num_spins)
 
 
 def add_contours(ax: Axes, lat: np.ndarray, long: np.ndarray, samples_per_rot: int, num_spins: int):
@@ -101,10 +114,11 @@ def add_contours(ax: Axes, lat: np.ndarray, long: np.ndarray, samples_per_rot: i
     X, Y = np.meshgrid(x, y)    # set up image grid
     lat_folded = lat[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)           # truncate data
     long_folded = long[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)
-    long_folded = np.rad2deg(unwrap(np.deg2rad(long_folded)))
+    long_folded = np.rad2deg(unwrap(np.deg2rad(long_folded)))                               # 2D phase unwraping to ensure continuous contours
     lat_contours = ax.contour(X, Y, lat_folded, levels=range(-90, 91, 30), colors='white', linestyles='solid', negative_linestyles='dotted')
     ax.clabel(lat_contours, inline=True, fmt='%.0f')
-    long_contours = ax.contour(X, Y, long_folded, levels=range(-360, 720, 30), colors='white', linestyles='dashed') # need to include larger range since data is wrapped
+    # long contours use levels outside [0, 360) since data is phase unwrapped
+    long_contours = ax.contour(X, Y, long_folded, levels=range(-360, 720, 30), colors='white', linestyles='dashed')
     ax.clabel(long_contours, inline=True, fmt=lambda x: f"{int(round(x)) % 360}")
 
 
@@ -117,7 +131,7 @@ def main():
     args = parser.parse_args()
     chs = [int(ch) for ch in args.ch.split(',')]
     for ch in chs: assert ch in range(1, 7), "Valid channel numbers are 1-6"    # validate channel inputs
-    
+
     IRDR_data_pj, GRDR_data_pj = load_PJ_data(args.PJ, args.dt, np.array(chs))
     time_series_plot(IRDR_data_pj, args.PJ)
     banana_plot(IRDR_data_pj, GRDR_data_pj)
