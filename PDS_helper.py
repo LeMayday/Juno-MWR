@@ -127,14 +127,14 @@ def load_PJ_data(pj: int, dt: float, chs: np.ndarray) -> tuple[pd.DataFrame, pd.
     GRDR_data_pj = GRDR_data_pj.rename(columns={'t_ephem_time': 'Time_ET', 't_utc_doy': 'Time_UTC'})
     IRDR_data_pj = IRDR_data_pj.rename(columns={str(CHANNELS[ch - 1]): f"Ch{ch}" for ch in chs})
 
-    # transform lat/lon data to x,y,z since interpolation requires continuous fields
-    for lat_col in GRDR_data_pj.columns:
-        if 'PC_lat' in lat_col:
-            lon_col = lat_col.replace('lat', 'lon')         # assume column name is the same minus lat/lon
-            x, y, z = lat_lon_to_pos(GRDR_data_pj[lat_col], GRDR_data_pj[lon_col])
-            GRDR_data_pj[lat_col.replace('lat', 'x')] = x
-            GRDR_data_pj[lat_col.replace('lat', 'y')] = y
-            GRDR_data_pj[lat_col.replace('lat', 'z')] = z
+    # # transform lat/lon data to x,y,z since interpolation requires continuous fields
+    # for lat_col in GRDR_data_pj.columns:
+    #     if 'PC_lat' in lat_col:
+    #         lon_col = lat_col.replace('lat', 'lon')         # assume column name is the same minus lat/lon
+    #         x, y, z = lat_lon_to_pos(GRDR_data_pj[lat_col], GRDR_data_pj[lon_col])
+    #         GRDR_data_pj[lat_col.replace('lat', 'x')] = x
+    #         GRDR_data_pj[lat_col.replace('lat', 'y')] = y
+    #         GRDR_data_pj[lat_col.replace('lat', 'z')] = z
 
     return IRDR_data_pj, GRDR_data_pj
 

@@ -100,7 +100,7 @@ def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame):
 
 
 def add_contours(ax: Axes, ch: int, GRDR_data_pj: pd.DataFrame, samples_per_rot: int, num_spins: int, type: Optional[str] = None):
-    # valid types: SIII, SIII_PC, SIII_NJ, VIP4, VIP4_PC, VIP4_NJ, PC
+    # valid types: SIII, SIII_NJ, VIP4, VIP4_NJ
     if type is None:
         return
     bkgd_lat = None; bkgd_lon = None; frgd_lat = None; frgd_lon = None
@@ -108,24 +108,24 @@ def add_contours(ax: Axes, ch: int, GRDR_data_pj: pd.DataFrame, samples_per_rot:
         bkgd_lat, bkgd_lon = get_SIII_lat_lon(GRDR_data_pj, ch)
     elif 'VIP4' in type:
         bkgd_lat, bkgd_lon = get_VIP4_lat_lon(GRDR_data_pj, ch)
-    if 'PC' in type:
-        frgd_lat, frgd_lon = get_PC_lat_lon(GRDR_data_pj, ch)
+    # if 'PC' in type:
+    #     frgd_lat, frgd_lon = get_PC_lat_lon(GRDR_data_pj, ch)
     # options are bkgd no frgd, bkgd no jupiter, bkgd w frgd, frgd no bkgd
     if bkgd_lat is not None:
         bkgd_lat_folded = bkgd_lat[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)     # truncate data
         bkgd_lon_folded = bkgd_lon[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)
         bkgd_lon_folded = np.rad2deg(unwrap(np.deg2rad(bkgd_lon_folded)))                           # 2D phase unwraping to ensure continuous contours
-        if frgd_lat or 'NJ' in type:
+        if frgd_lat is not None or 'NJ' in type:
             jupiter_mask = channel_jupiter_2Dmask(ch, GRDR_data_pj, samples_per_rot, num_spins)     # could also get this from frgd data?
             bkgd_lat_folded[jupiter_mask] = np.nan
             bkgd_lon_folded[jupiter_mask] = np.nan
         plot_contours(ax, bkgd_lat_folded, bkgd_lon_folded)
-    if frgd_lat is not None:
-        frgd_lat_folded = frgd_lat[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)     # truncate data
-        frgd_lon_folded = frgd_lon[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)
-        frgd_lon_folded_masked = np.ma.masked_invalid(frgd_lon_folded)                              # unwrap also allows masked arrays
-        frgd_lon_folded = np.rad2deg(unwrap(np.deg2rad(frgd_lon_folded_masked)))                    # 2D phase unwraping to ensure continuous contours
-        plot_contours(ax, frgd_lat_folded, frgd_lon_folded)
+    # if frgd_lat is not None:
+    #     frgd_lat_folded = frgd_lat[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)     # truncate data
+    #     frgd_lon_folded = frgd_lon[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)
+    #     frgd_lon_folded_masked = np.ma.masked_invalid(frgd_lon_folded)                              # unwrap also allows masked arrays
+    #     frgd_lon_folded = np.rad2deg(unwrap(np.deg2rad(frgd_lon_folded_masked)))                    # 2D phase unwraping to ensure continuous contours
+    #     plot_contours(ax, frgd_lat_folded, frgd_lon_folded)
 
 
 def plot_contours(ax: Axes, lat_folded: np.ndarray, lon_folded: np.ndarray):
