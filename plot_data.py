@@ -40,6 +40,7 @@ def fill_missing_data(data: pd.DataFrame) -> pd.DataFrame:
 
 def channel_jupiter_2Dmask(ch: int, GRDR_data_pj: pd.DataFrame, samples_per_rot: int, num_spins: int) -> np.ndarray:
     # planetocentric lat/long of antenna boresight surface intercept seems to be only provided when antenna is looking at Jupiter
+    if ch in range(2, 7): ch = 2
     columns_to_select = [col for col in COLS_GRDR if 'PC_lon_Js' in col and f'B{ch}' in col]
     data = GRDR_data_pj[columns_to_select].to_numpy()
     mask = ~np.isnan(data)

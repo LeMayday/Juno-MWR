@@ -13,13 +13,13 @@ COLS_IRDR = ['t_ephem_time', 't_utc_doy', 'R1_1TA', 'R1_2TA', 'R2_1TA', 'R2_2TA'
 CHANNELS = np.array(['R1_1TA', 'R2_1TA', 'R3TA', 'R4TA', 'R5TA', 'R6TA'])
 # time
 # values are only provided when given antenna is pointed at Jupiter -- can use as Jupiter mask
-# boresight components in VIP4 magnetic coordinate frame
-# boresight components in SIII coordinate frame
+# boresight components in VIP4 magnetic coordinate frame (Ch 2-6 are all the same)
+# boresight components in SIII coordinate frame (Ch 2-6 are all the same)
 # Juno position to Jupiter center (range, long, lat, VIP4, SIII)
 COLS_GRDR = ['t_ephem_time', 't_utc_doy', 
-             'PC_lon_JsB1', 'PC_lat_JsB1', 'PC_lon_JsB2', 'PC_lat_JsB2', 'PC_lon_JsB3', 'PC_lat_JsB3', 'PC_lon_JsB4', 'PC_lat_JsB4', 'PC_lon_JsB5', 'PC_lat_JsB5', 'PC_lon_JsB6', 'PC_lat_JsB6',
-             'JMag_x_B1', 'JMag_y_B1', 'JMag_z_B1', 'JMag_x_B2', 'JMag_y_B2', 'JMag_z_B2', 'JMag_x_B3',	'JMag_y_B3', 'JMag_z_B3', 'JMag_x_B4', 'JMag_y_B4', 'JMag_z_B4', 'JMag_x_B5', 'JMag_y_B5', 'JMag_z_B5', 'JMag_x_B6', 'JMag_y_B6', 'JMag_z_B6',
-             'S3RH_x_B1', 'S3RH_y_B1', 'S3RH_z_B1', 'S3RH_x_B2', 'S3RH_y_B2', 'S3RH_z_B2', 'S3RH_x_B3', 'S3RH_y_B3', 'S3RH_z_B3', 'S3RH_x_B4', 'S3RH_y_B4', 'S3RH_z_B4', 'S3RH_x_B5', 'S3RH_y_B5', 'S3RH_z_B5', 'S3RH_x_B6', 'S3RH_y_B6', 'S3RH_z_B6',
+             'PC_lon_JsB1', 'PC_lat_JsB1', 'PC_lon_JsB2', 'PC_lat_JsB2',
+             'JMag_x_B1', 'JMag_y_B1', 'JMag_z_B1', 'JMag_x_B2', 'JMag_y_B2', 'JMag_z_B2',
+             'S3RH_x_B1', 'S3RH_y_B1', 'S3RH_z_B1', 'S3RH_x_B2', 'S3RH_y_B2', 'S3RH_z_B2',
              'range_JnJc', 'PC_lon_JsJnJc', 'PC_lat_JsJnJc', 'JMag_x_JcJn', 'JMag_y_JcJn', 'JMag_z_JcJn', 'S3RH_x_JcJn', 'S3RH_y_JcJn', 'S3RH_z_JcJn']
 
 
@@ -96,18 +96,12 @@ def download_clean_data(PDS_data_df) -> pd.DataFrame:
     return sorted_filepaths_df
 
 
-def load_PJ_data(pj: int, dt: float, chs: np.ndarray) -> tuple[pd.DataFrame, pd.DataFrame]:
+def load_PJ_data(pj: int, dt: float, chs: np.ndarray, keep_cols_GRDR: list[str] = COLS_GRDR) -> tuple[pd.DataFrame, pd.DataFrame]:
     t_min, t_max = get_tmin_tmax(pj, dt)        # PDS queries by time range
     filepaths_df = PDS_query(t_min, t_max)      # get list of filepaths
     
     # read only the columns pertinent to this processing (e.g. channel specific -- does not change csv)
     keep_cols_IRDR = ['t_ephem_time', 't_utc_doy', *CHANNELS[chs - 1].tolist()]
-    keep_cols_GRDR = []
-    for col in COLS_GRDR:   # 'B' is boresight for channel, keep all non-channel cols and only those channels specified
-        if 'B' not in col: keep_cols_GRDR.append(col)
-        else:
-            for ch in [f'B{ch}' for ch in chs]:
-                if ch in col: keep_cols_GRDR.append(col)
     
     # read and truncate the data by time and selected columns
     dfs = [[], []]
@@ -140,18 +134,21 @@ def load_PJ_data(pj: int, dt: float, chs: np.ndarray) -> tuple[pd.DataFrame, pd.
 
 
 def get_SIII_lat_lon(GRDR_data_pj: pd.DataFrame, ch: int) -> tuple[np.ndarray, np.ndarray]:
+    if ch in range(2, 7): ch = 2
     columns_to_select = [f'S3RH_x_B{ch}', f'S3RH_y_B{ch}', f'S3RH_z_B{ch}']
     data_x, data_y, data_z = np.hsplit(GRDR_data_pj[columns_to_select].to_numpy(), 3)
     return lat_lonW(data_x, data_y, data_z)
 
 
 def get_VIP4_lat_lon(GRDR_data_pj: pd.DataFrame, ch: int) -> tuple[np.ndarray, np.ndarray]:
+    if ch in range(2, 7): ch = 2
     columns_to_select = [f'JMag_x_B{ch}', f'JMag_y_B{ch}', f'JMag_z_B{ch}']
     data_x, data_y, data_z = np.hsplit(GRDR_data_pj[columns_to_select].to_numpy(), 3)
     return lat_lonE(data_x, data_y, data_z)
 
 
 def get_PC_lat_lon(GRDR_data_pj: pd.DataFrame, ch: int) -> tuple[np.ndarray, np.ndarray]:
+    if ch in range(2, 7): ch = 2
     columns_to_select = [f'PC_x_JsB{ch}', f'PC_y_JsB{ch}', f'PC_z_JsB{ch}']
     data_x, data_y, data_z = np.hsplit(GRDR_data_pj[columns_to_select].to_numpy(), 3)
     return lat_lonE(data_x, data_y, data_z)
