@@ -95,7 +95,7 @@ def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame, overlay_
         im = axes[i].imshow(data_folded, cmap='gist_ncar', aspect='auto', origin='lower')
         fig.colorbar(im, ax=axes[i])
         # note ch is "Ch{i}"
-        add_contours(axes[i], ch[2], GRDR_data_pj, samples_per_rot, num_spins, overlay_type)
+        add_contours(axes[i], int(ch[2]), GRDR_data_pj, samples_per_rot, num_spins, overlay_type)
     fig.tight_layout()
     plt.show()
 
