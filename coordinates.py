@@ -41,7 +41,7 @@ def lat_lonE(x: np.ndarray, y: np.ndarray, z: np.ndarray) -> tuple[np.ndarray, n
 def lat_lonW(x: np.ndarray, y: np.ndarray, z: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     # longitude increasing to the west
     lat, lon = lat_lonE(x, y, z)
-    lon = 360 - lon
+    lon = (360 - lon) % 360
     return lat, lon
 
 
