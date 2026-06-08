@@ -80,7 +80,7 @@ def time_series_plot(IRDR_data_pj: pd.DataFrame, pj: int):
     plt.show()
 
 
-def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame):
+def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame, overlay_type: Optional[str] = None):
     IRDR_data_pj = fill_missing_data(IRDR_data_pj)
     GRDR_data_pj = fill_missing_data(GRDR_data_pj)
     samples_per_rot = 307   # 30.7 s/rot Santos-Costa+2017, 1 sample per 100 ms
@@ -94,12 +94,12 @@ def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame):
         im = axes[i].imshow(data_folded, cmap='gist_ncar', aspect='auto', origin='lower')
         fig.colorbar(im, ax=axes[i])
         # note ch is "Ch{i}"
-        add_contours(axes[i], ch[2], GRDR_data_pj, samples_per_rot, num_spins, type='SIII')
+        add_contours(axes[i], ch[2], GRDR_data_pj, samples_per_rot, num_spins, overlay_type)
     fig.tight_layout()
     plt.show()
 
 
-def add_contours(ax: Axes, ch: int, GRDR_data_pj: pd.DataFrame, samples_per_rot: int, num_spins: int, type: Optional[str] = None):
+def add_contours(ax: Axes, ch: int, GRDR_data_pj: pd.DataFrame, samples_per_rot: int, num_spins: int, type: Optional[str]):
     # valid types: SIII, SIII_NJ, VIP4, VIP4_NJ
     if type is None:
         return
@@ -148,13 +148,14 @@ def main():
     parser.add_argument("--PJ", required=True, type=int, help="Perijove")
     parser.add_argument("--dt", required=True, type=float, help="Delta time in minutes")
     parser.add_argument("--ch", required=False, type=str, default="1,2,3,4,5,6", help="List of channels separated by comma")
+    parser.add_argument("--type", required=False, type=str, default=None, choices=["SIII", "SIII_NJ", "VIP4", "VIP4_NJ"], help="Contour overlay type")
     args = parser.parse_args()
     chs = [int(ch) for ch in args.ch.split(',')]
     for ch in chs: assert ch in range(1, 7), "Valid channel numbers are 1-6"    # validate channel inputs
 
     IRDR_data_pj, GRDR_data_pj = load_PJ_data(args.PJ, args.dt, np.array(chs))
     time_series_plot(IRDR_data_pj, args.PJ)
-    banana_plot(IRDR_data_pj, GRDR_data_pj)
+    banana_plot(IRDR_data_pj, GRDR_data_pj, args.type)
 
 
 if __name__ == "__main__":
