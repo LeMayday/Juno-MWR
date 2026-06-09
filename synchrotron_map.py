@@ -24,9 +24,9 @@ def parse_PJs(PJ_str: str) -> list[int]:
     res = []
     for PJ_range in PJ_str.split(','):
         if '-' in PJ_range:
-            PJ_start = PJ_range.split('-')[0]
-            PJ_end = PJ_range.split('-')[1]
-            res.append(*range(PJ_start, PJ_end + 1))
+            PJ_start = int(PJ_range.split('-')[0])
+            PJ_end = int(PJ_range.split('-')[1])
+            res.extend(range(PJ_start, PJ_end + 1))
         else:
             res.append(int(PJ_range))
     return res
