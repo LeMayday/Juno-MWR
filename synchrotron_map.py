@@ -35,20 +35,26 @@ def parse_PJs(PJ_str: str) -> list[int]:
     return res
 
 
-def compile_data(pjs: list[int], dt: int, chs: np.ndarray, da: float, R_sync: float, nside: int = 128) -> np.ndarray:    
+def compile_data(pjs: list[int], dt: int, chs: np.ndarray, da: float, R_sync: float, type: str, nside: int = 128) -> np.ndarray:
     # healpix has pixels ordered by index, so (lat, lon) -> (npix)
     # see https://lambda.gsfc.nasa.gov/toolbox/pixelcoords.html for nside -> npix
     # create numpy array that is (#chs, #pix, #pjs) so i can take median over pjs
     res = np.empty((len(chs), hp.nside2npix(nside), len(pjs)))
     res[:] = np.nan     # initialize as NaNs
+    if type == "SIII":
+        col_prefix = 'S3RH'
+        lat_lon_func = lat_lonW
+    elif type == "VIP4":
+        col_prefix = 'JMag'
+        lat_lon_func = lat_lonE
     for i, pj in enumerate(pjs):
         IRDR_data_pj, GRDR_data_pj = load_PJ_data(pj, dt, chs, keep_cols_GRDR=COLS_GRDR_MAP)
         # grab relevant columns
-        Jn_SIII = GRDR_data_pj[['S3RH_x_JcJn', 'S3RH_y_JcJn', 'S3RH_z_JcJn']].to_numpy()        # apparently this is not normalized
+        Jn_SIII = GRDR_data_pj[[f'{col_prefix}_x_JcJn', f'{col_prefix}_y_JcJn', f'{col_prefix}_z_JcJn']].to_numpy()     # apparently this is not normalized
         Jn_range = np.linalg.norm(Jn_SIII, axis=1)                                         
-        Jn_SIII_norm = Jn_SIII / np.expand_dims(Jn_range, axis=1)                               # normalized
-        boresight_SIII_1 = GRDR_data_pj[[f'S3RH_x_B1', f'S3RH_y_B1', f'S3RH_z_B1']].to_numpy()  # normalized
-        boresight_SIII_2 = GRDR_data_pj[[f'S3RH_x_B2', f'S3RH_y_B2', f'S3RH_z_B2']].to_numpy()  # normalized
+        Jn_SIII_norm = Jn_SIII / np.expand_dims(Jn_range, axis=1)                                                       # normalized
+        boresight_SIII_1 = GRDR_data_pj[[f'{col_prefix}_x_B1', f'{col_prefix}_y_B1', f'{col_prefix}_z_B1']].to_numpy()  # normalized
+        boresight_SIII_2 = GRDR_data_pj[[f'{col_prefix}_x_B2', f'{col_prefix}_y_B2', f'{col_prefix}_z_B2']].to_numpy()  # normalized
         # filter by range
         range_mask = Jn_range < R_sync * RJ
         # filter by angle condition -- masks should have same size as original dataframe
@@ -68,7 +74,7 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, da: float, R_sync: fl
                 T_a = T_a[mask2]
             s = s / np.expand_dims(np.linalg.norm(s, axis=1), axis=1)                           # normalized
             s_x, s_y, s_z = np.hsplit(s, 3)
-            true_lat, true_lon = lat_lonW(s_x, s_y, s_z)    # lat [-90,90], lon [0, 360)
+            true_lat, true_lon = lat_lon_func(s_x, s_y, s_z)    # lat [-90,90], lon [0, 360)
             true_lat = true_lat.squeeze(); true_lon = true_lon.squeeze()    # inputs to healpy must be (N,)
             assert T_a.shape == true_lat.shape == true_lon.shape, "T_a, true_lat, and true_lon must have same shape!"
             binned_medians = bin_data(T_a, true_lat, true_lon, nside)
@@ -88,7 +94,11 @@ def stack_data(data: np.ndarray) -> np.ndarray:
     return np.nanmedian(data, axis=2)
 
 
-def plot_swath(chs: np.ndarray, data: np.ndarray, params_str: str):
+def plot_swath(data: np.ndarray, params_str: str, type: str):
+    if type == "SIII":
+        flip = 'astro'
+    elif type == "VIP4":
+        flip = 'geo'
     fig = plt.figure(figsize=(12,8))
     axes = make_subplots(fig, len(chs))
     for i, ch in enumerate(chs):   # skip time columns
@@ -126,15 +136,16 @@ def main():
     parser.add_argument("--ch", required=False, type=str, default="1,2,3,4,5,6", help="List of channels separated by comma")
     parser.add_argument("--PJs", required=True, type=str, help="Perijove range (e.g. 1,2,5,6 or 1-7 or 1,3-6)")
     parser.add_argument("--Rsync", required=False, type=float, default=1.4, help="Assumed radius of synchrotron emission (in Rj)")
+    parser.add_argument("--type", required=False, type=str, default="SIII", choices=["SIII", "VIP4"], help="Coordinate frame type")
     args = parser.parse_args()
     chs = np.array([int(ch) for ch in args.ch.split(',')])
     for ch in chs: assert ch in range(1, 7), "Valid channel numbers are 1-6"
     pjs = parse_PJs(args.PJs)
     for pj in pjs: assert pj in range(1, 78), "Valid perijoves numbers are 1-77"
 
-    time_series_data = compile_data(pjs, args.dt, chs, args.da, args.Rsync)
+    time_series_data = compile_data(pjs, args.dt, chs, args.da, args.Rsync, args.type)
     stacked_data = stack_data(time_series_data)
-    plot_swath(chs, stacked_data, f"PJs{args.PJs}_CHs{args.ch}_da{args.da}_dt{args.dt}_Rsync{args.Rsync}")
+    plot_swath(chs, stacked_data, f"PJs{args.PJs}_CHs{args.ch}_da{args.da}_dt{args.dt}_Rsync{args.Rsync}_{args.type}")
 
 
 if __name__ == "__main__":
