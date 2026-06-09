@@ -99,34 +99,19 @@ def plot_swath(data: np.ndarray, params_str: str, type: str):
         flip = 'astro'
     elif type == "VIP4":
         flip = 'geo'
-    fig = plt.figure(figsize=(12,8))
-    axes = make_subplots(fig, len(chs))
-    for i, ch in enumerate(chs):   # skip time columns
-        projected_map = hp.cartview(data[i, :], nest=True, return_projected_map=True)       # by default, E should be to the left
-        im = axes[i].imshow(projected_map, origin='lower', cmap='gist_ncar', aspect='auto', extent=[-180, 180, -90, 90])
-        axes[i].set_xticks(range(-180, 181, 30))
-        axes[i].set_xticklabels(range(180, -181, -30))
-        axes[i].set_yticks(range(-90, 91, 15))
-        axes[i].grid()
-        fig.colorbar(im, ax=axes[i])
-        # note ch is "Ch{i}"
-        # add_contours(axes[i], ch[2], GRDR_data_pj, samples_per_rot, num_spins, overlay_type)
+    fig = plt.figure(figsize=(18,8))
+    axes = make_subplots(fig, data.shape[0])
+    for i, ax in enumerate(axes):
+        projected_map = hp.cartview(data[i, :], nest=True, flip=flip, return_projected_map=True)    # by default, E should be to the left
+        im = ax.imshow(projected_map, origin='lower', cmap='gist_ncar', aspect='auto', extent=[-180, 180, -90, 90])
+        ax.set_xticks(range(-180, 181, 30))
+        ax.set_xticklabels(range(180, -181, -30))
+        ax.set_yticks(range(-90, 91, 15))
+        ax.grid()
+        fig.colorbar(im, ax=ax)
     fig.tight_layout()
     plt.show()
     fig.savefig(f"MWR_swath_{params_str}.png", dpi=300)
-
-
-def add_contours(ax: Axes, nlon: int, nlat: int):
-    x = np.arange(nlon)
-    y = np.arange(nlat)
-    X, Y = np.meshgrid(x, y)    # set up image grid
-    lat_SIII = np.linspace(-90, 90, nlat)
-    lon_SIII = np.flip(np.linspace(-180, 180, nlon))
-    Lat_SIII, Lon_SIII = np.meshgrid(lat_SIII, lon_SIII)
-    lat_contours = ax.contour(X, Y, Lat_SIII, levels=range(-90, 91, 15), colors='black', linestyles='solid')
-    ax.clabel(lat_contours, inline=True, fmt='%.0f')
-    lon_contours = ax.contour(X, Y, Lon_SIII, levels=range(-180, 180, 30), colors='white', linestyles='dashed')
-    ax.clabel(lon_contours, inline=True, fmt=lambda x: f"{int(round(x)) % 360}")
 
 
 def main():
