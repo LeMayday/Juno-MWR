@@ -119,7 +119,6 @@ def add_contours(ax: Axes, nlon: int, nlat: int):
 
 
 def main():
-    os.makedirs(DATA_DIR, exist_ok=True)
     parser = argparse.ArgumentParser()
     parser.add_argument("--dt", required=True, type=float, help="Delta time around each perijove in minutes")
     parser.add_argument("--da", required=True, type=float, help="Delta angle tolerance btwn boresight and s/c lat/lon")

@@ -7,12 +7,11 @@ from matplotlib.figure import Figure
 from unwrap import unwrap
 
 # local files
-from PDS_helper import DATA_DIR, COLS_GRDR, load_PJ_data, get_SIII_lat_lon, get_VIP4_lat_lon, get_PC_lat_lon
+from PDS_helper import COLS_GRDR, load_PJ_data, get_SIII_lat_lon, get_VIP4_lat_lon, get_PC_lat_lon
 from coordinates import get_PJ_time_ET
 
 # default
 import argparse
-import os
 from typing import Optional
 
 
@@ -144,7 +143,6 @@ def plot_contours(ax: Axes, lat_folded: np.ndarray, lon_folded: np.ndarray):
 
 
 def main():
-    os.makedirs(DATA_DIR, exist_ok=True)
     parser = argparse.ArgumentParser()
     parser.add_argument("--PJ", required=True, type=int, help="Perijove")
     parser.add_argument("--dt", required=True, type=float, help="Delta time in minutes")

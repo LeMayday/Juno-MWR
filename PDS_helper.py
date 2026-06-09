@@ -1,12 +1,18 @@
 # helper functions for downloading and loading data from PDS
 
+# modules
 import pandas as pd
 import pds.peppi as pep
 import numpy as np
-from datetime import datetime
 import requests
-import os
+
+# local files
 from coordinates import get_tmin_tmax, lat_lonE, lat_lonW, lat_lon_to_pos
+
+# default
+from datetime import datetime
+import os
+
 
 DATA_DIR = os.path.join('.', 'data')
 COLS_IRDR = ['t_ephem_time', 't_utc_doy', 'R1_1TA', 'R1_2TA', 'R2_1TA', 'R2_2TA', 'R3TA', 'R4TA', 'R5TA', 'R6TA']
@@ -30,10 +36,12 @@ def find_file(filename: str):
     return None
 
 
-def download_file(url: str, fname: str):
+def download_file(url: str, fname: str, pj: int):
     # see https://www.geeksforgeeks.org/python/how-to-download-files-from-urls-with-python/
     response = requests.get(url)
-    fpath = os.path.join(DATA_DIR, fname)
+    dir_path = os.path.join(DATA_DIR, f"PJ_{pj}")
+    os.makedirs(dir_path, exist_ok=True)
+    fpath = os.path.join(DATA_DIR, f"PJ_{pj}", fname)
     if response.status_code == 200:
         with open(fpath, 'wb') as file:
             file.write(response.content)
@@ -43,7 +51,8 @@ def download_file(url: str, fname: str):
         return None
 
 
-def PDS_query(t_min: datetime, t_max: datetime) -> pd.DataFrame:
+def PDS_query(t_min: datetime, t_max: datetime, pj: int) -> pd.DataFrame:
+    # PJ# is not needed for PDS query, but it helps organize files
     # query PDS and return time-sorted DataFrame of filenames with desired information
     client = pep.PDSRegistryClient()
     products = pep.Products(client) \
@@ -62,10 +71,10 @@ def PDS_query(t_min: datetime, t_max: datetime) -> pd.DataFrame:
     # replace _V03 with _V04 (for some reason, peppi doesn't grab newest data version)
     cols = ['urls', 'filenames']
     PDS_data_df[cols] = PDS_data_df[cols].map(lambda item: [str(i).replace('_V03', '_V04') for i in item])
-    return download_clean_data(PDS_data_df)
+    return download_clean_data(PDS_data_df, pj)
 
 
-def download_data(PDS_data_df: pd.DataFrame) -> pd.DataFrame:
+def download_data(PDS_data_df: pd.DataFrame, pj: int) -> pd.DataFrame:
     IRDR_list = []
     GRDR_list = []
     for url_list, fname_list in zip(PDS_data_df['urls'], PDS_data_df['filenames']):
@@ -74,7 +83,7 @@ def download_data(PDS_data_df: pd.DataFrame) -> pd.DataFrame:
                 continue
             fpath = find_file(fname)
             if fpath is None:   # if file not already downloaded, download file
-                fpath = download_file(url, fname)
+                fpath = download_file(url, fname, pj)
             if "RI" in fname:
                 IRDR_list.append(fpath)
             elif "RG" in fname:
@@ -84,8 +93,8 @@ def download_data(PDS_data_df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame({'IRDR_CSV': IRDR_list, 'GRDR_CSV': GRDR_list})
 
 
-def download_clean_data(PDS_data_df) -> pd.DataFrame:
-    sorted_filepaths_df = download_data(PDS_data_df)
+def download_clean_data(PDS_data_df: pd.DataFrame, pj: int) -> pd.DataFrame:
+    sorted_filepaths_df = download_data(PDS_data_df, pj)
     # remove unneeded csv columns to reduce file size (Note: This overwrites the csv file!)
     for IRDR_csv_path in sorted_filepaths_df['IRDR_CSV']:
         df = pd.read_csv(IRDR_csv_path, usecols=COLS_IRDR)
@@ -98,7 +107,7 @@ def download_clean_data(PDS_data_df) -> pd.DataFrame:
 
 def load_PJ_data(pj: int, dt: float, chs: np.ndarray, keep_cols_GRDR: list[str] = COLS_GRDR) -> tuple[pd.DataFrame, pd.DataFrame]:
     t_min, t_max = get_tmin_tmax(pj, dt)        # PDS queries by time range
-    filepaths_df = PDS_query(t_min, t_max)      # get list of filepaths
+    filepaths_df = PDS_query(t_min, t_max, pj)  # get list of filepaths
     
     # read only the columns pertinent to this processing (e.g. channel specific -- does not change csv)
     keep_cols_IRDR = ['t_ephem_time', 't_utc_doy', *CHANNELS[chs - 1].tolist()]
