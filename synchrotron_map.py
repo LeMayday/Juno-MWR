@@ -97,15 +97,17 @@ def stack_data(data: np.ndarray) -> np.ndarray:
 def plot_swath(data: np.ndarray, params_str: str, type: str):
     if type == "SIII":
         flip = 'astro'
+        xtick_labels = range(180, -181, -30)
     elif type == "VIP4":
         flip = 'geo'
+        xtick_labels = range(-180, 181, 30)
     fig = plt.figure(figsize=(18,8))
     axes = make_subplots(fig, data.shape[0])
     for i, ax in enumerate(axes):
         projected_map = hp.cartview(data[i, :], nest=True, flip=flip, return_projected_map=True)    # by default, E should be to the left
         im = ax.imshow(projected_map, origin='lower', cmap='gist_ncar', aspect='auto', extent=[-180, 180, -90, 90])
         ax.set_xticks(range(-180, 181, 30))
-        ax.set_xticklabels(range(180, -181, -30))
+        ax.set_xticklabels(xtick_labels)
         ax.set_yticks(range(-90, 91, 15))
         ax.grid()
         fig.colorbar(im, ax=ax)
