@@ -88,7 +88,7 @@ def stack_data(data: np.ndarray) -> np.ndarray:
     return np.nanmedian(data, axis=2)
 
 
-def plot_swath(chs: np.ndarray, data: np.ndarray):
+def plot_swath(chs: np.ndarray, data: np.ndarray, params_str: str):
     fig = plt.figure(figsize=(12,8))
     axes = make_subplots(fig, len(chs))
     for i, ch in enumerate(chs):   # skip time columns
@@ -103,6 +103,7 @@ def plot_swath(chs: np.ndarray, data: np.ndarray):
         # add_contours(axes[i], ch[2], GRDR_data_pj, samples_per_rot, num_spins, overlay_type)
     fig.tight_layout()
     plt.show()
+    fig.savefig(f"MWR_swath_{params_str}.png", dpi=300)
 
 
 def add_contours(ax: Axes, nlon: int, nlat: int):
@@ -133,7 +134,7 @@ def main():
 
     time_series_data = compile_data(pjs, args.dt, chs, args.da, args.Rsync)
     stacked_data = stack_data(time_series_data)
-    plot_swath(chs, stacked_data)
+    plot_swath(chs, stacked_data, f"PJs{args.PJs}_CHs{args.ch}_da{args.da}_dt{args.dt}_Rsync{args.Rsync}")
 
 
 if __name__ == "__main__":
