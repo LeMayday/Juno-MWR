@@ -29,6 +29,12 @@ COLS_GRDR = ['t_ephem_time', 't_utc_doy',
              'range_JnJc', 'PC_lon_JsJnJc', 'PC_lat_JsJnJc', 'JMag_x_JcJn', 'JMag_y_JcJn', 'JMag_z_JcJn', 'S3RH_x_JcJn', 'S3RH_y_JcJn', 'S3RH_z_JcJn']
 
 
+class NoProductsError(Exception):
+    # Raised when PDS does not return any products for query
+    # e.g. there is no data on PDS for PJ2 (2016-293T18:10:53)
+    pass
+
+
 def find_file(filename: str):
     for root, _, files in os.walk(DATA_DIR):
         if filename in files:
@@ -65,7 +71,14 @@ def PDS_query(t_min: datetime, t_max: datetime, pj: int) -> pd.DataFrame:
     # grab file urls and names into dataframe
     file_ref_lbl = 'ops:Data_File_Info.ops:file_ref'
     file_name_lbl = 'ops:Data_File_Info.ops:file_name'
-    PDS_data_df = products.as_dataframe()[[file_ref_lbl, file_name_lbl]]
+    try:
+        PDS_data_df = products.as_dataframe()[[file_ref_lbl, file_name_lbl]]
+    except TypeError as err:
+        msg = str(err)
+        if "'NoneType' object is not subscriptable" == msg:
+            print(f"Query returned no results for PJ {pj}")
+            raise NoProductsError
+        raise
     # rename for easier access (this affects other functions!)
     PDS_data_df = PDS_data_df.rename(columns={file_ref_lbl: 'urls', file_name_lbl: 'filenames'})
     # replace _V03 with _V04 (for some reason, peppi doesn't grab newest data version)

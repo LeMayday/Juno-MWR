@@ -6,7 +6,7 @@ import healpy as hp
 
 # local files
 from plot_data import make_subplots
-from PDS_helper import DATA_DIR, load_PJ_data
+from PDS_helper import DATA_DIR, load_PJ_data, NoProductsError
 from coordinates import lat_lonW, lat_lonE
 
 # default
@@ -45,7 +45,10 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, da: float, R_sync: fl
         col_prefix = 'JMag'
         lat_lon_func = lat_lonE
     for i, pj in enumerate(pjs):
-        IRDR_data_pj, GRDR_data_pj = load_PJ_data(pj, dt, chs, keep_cols_GRDR=COLS_GRDR_MAP)
+        try:
+            IRDR_data_pj, GRDR_data_pj = load_PJ_data(pj, dt, chs, keep_cols_GRDR=COLS_GRDR_MAP)
+        except NoProductsError as err:
+            continue
         # grab relevant columns
         Jn_SIII = GRDR_data_pj[[f'{col_prefix}_x_JcJn', f'{col_prefix}_y_JcJn', f'{col_prefix}_z_JcJn']].to_numpy()     # apparently this is not normalized
         Jn_range = np.linalg.norm(Jn_SIII, axis=1)                                         
