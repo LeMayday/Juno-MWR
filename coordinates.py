@@ -1,9 +1,12 @@
 # helper functions for time and space coordinates
 
+# modules
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
 from astropy.time import Time
+
+# default
+from datetime import datetime, timedelta
 
 
 def get_PJ_time(pj: int) -> datetime:

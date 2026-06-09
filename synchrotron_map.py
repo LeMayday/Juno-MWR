@@ -1,8 +1,6 @@
 # modules
-import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.axes import Axes
 from scipy.stats import binned_statistic
 import healpy as hp
 
@@ -13,7 +11,6 @@ from coordinates import lat_lonW, lat_lonE
 
 # default
 import argparse
-import os
 
 RJ = 71492  # km
 # only the cols needed for the map
