@@ -35,8 +35,13 @@ class NoProductsError(Exception):
     pass
 
 
-def find_file(filename: str):
-    for root, _, files in os.walk(DATA_DIR):
+class FileDownloadError(Exception):
+    # Raised when requests fails to download all of the files, even if PDS returns products
+    pass
+
+
+def find_file(filename: str, pj: int):
+    for root, _, files in os.walk(DATA_DIR, f"PJ_{pj}"):
         if filename in files:
             return os.path.join(root, filename)
     return None
@@ -88,21 +93,34 @@ def PDS_query(t_min: datetime, t_max: datetime, pj: int) -> pd.DataFrame:
 
 
 def download_data(PDS_data_df: pd.DataFrame, pj: int) -> pd.DataFrame:
-    IRDR_list = []
     GRDR_list = []
+    IRDR_list = []
+    files_to_skip = []
     for url_list, fname_list in zip(PDS_data_df['urls'], PDS_data_df['filenames']):
         for url, fname in zip(url_list, fname_list):
-            if ".LBL" in fname: # skip LBL files
+            # note RG files are always listed first
+            if ".LBL" in fname:         # skip LBL files
                 continue
-            fpath = find_file(fname)
-            if fpath is None:   # if file not already downloaded, download file
+            if fname in files_to_skip:  # skip files whose partner couldn't be downloaded
+                continue
+            fpath = find_file(fname, pj)
+            if fpath is None:           # if file not already downloaded, download file
                 fpath = download_file(url, fname, pj)
-            if "RI" in fname:
-                IRDR_list.append(fpath)
-            elif "RG" in fname:
+                if fpath is None:       # if couldn't download, skip and need to remove
+                    if 'RG' in fname:
+                        files_to_skip.append(fname.replace('RG', 'RI'))
+                    elif 'RI' in fname:
+                        GRDR_list.remove(fpath.replace('RI', 'RG'))
+                    continue
+            if "RG" in fname:
                 GRDR_list.append(fpath)
-    IRDR_list.sort()    # assumes file naming convention sorts in ascending time order
-    GRDR_list.sort()
+            elif "RI" in fname:
+                IRDR_list.append(fpath)
+    assert len(GRDR_list) == len(IRDR_list), "Lists of GRDR and IRDR file paths should have the same length"
+    if len(GRDR_list) == 0:
+        raise FileDownloadError
+    GRDR_list.sort()    # assumes file naming convention sorts in ascending time order
+    IRDR_list.sort()
     return pd.DataFrame({'IRDR_CSV': IRDR_list, 'GRDR_CSV': GRDR_list})
 
 
