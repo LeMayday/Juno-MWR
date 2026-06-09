@@ -80,7 +80,7 @@ def time_series_plot(IRDR_data_pj: pd.DataFrame, pj: int):
     plt.show()
 
 
-def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame, overlay_type: Optional[str] = None):
+def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame, pj: int, chs: str, overlay_type: Optional[str] = None):
     IRDR_data_pj = fill_missing_data(IRDR_data_pj)
     GRDR_data_pj = fill_missing_data(GRDR_data_pj)
     samples_per_rot = 307   # 30.7 s/rot Santos-Costa+2017, 1 sample per 100 ms
@@ -96,7 +96,7 @@ def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame, overlay_
         # note ch is "Ch{i}"
         add_contours(axes[i], int(ch[2]), GRDR_data_pj, samples_per_rot, num_spins, overlay_type)
     fig.tight_layout()
-    plt.show()
+    fig.savefig(f"MWR_banana_PJ{pj}_CHs{chs}_{overlay_type}.png", dpi=300)
 
 
 def add_contours(ax: Axes, ch: int, GRDR_data_pj: pd.DataFrame, samples_per_rot: int, num_spins: int, type: Optional[str]):
@@ -154,7 +154,7 @@ def main():
 
     IRDR_data_pj, GRDR_data_pj = load_PJ_data(args.PJ, args.dt, np.array(chs))
     time_series_plot(IRDR_data_pj, args.PJ)
-    banana_plot(IRDR_data_pj, GRDR_data_pj, args.type)
+    banana_plot(IRDR_data_pj, GRDR_data_pj, args.PJ, args.ch, args.type)
 
 
 if __name__ == "__main__":
