@@ -111,7 +111,7 @@ def plot_swath(data: np.ndarray, params_str: str, type: str):
         fig.colorbar(im, ax=ax)
     fig.tight_layout()
     plt.show()
-    fig.savefig(f"MWR_swath_{params_str}.png", dpi=300)
+    fig.savefig(f"MWR_swath_{params_str}_{type}.png", dpi=300)
 
 
 def main():
@@ -130,7 +130,7 @@ def main():
 
     time_series_data = compile_data(pjs, args.dt, chs, args.da, args.Rsync, args.type)
     stacked_data = stack_data(time_series_data)
-    plot_swath(chs, stacked_data, f"PJs{args.PJs}_CHs{args.ch}_da{args.da}_dt{args.dt}_Rsync{args.Rsync}_{args.type}")
+    plot_swath(stacked_data, f"PJs{args.PJs}_CHs{args.ch}_da{args.da}_dt{args.dt}_Rsync{args.Rsync}", args.type)
 
 
 if __name__ == "__main__":
