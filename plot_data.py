@@ -95,6 +95,7 @@ def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame, params_s
         fig.colorbar(im, ax=axes[i])
         # note ch is "Ch{i}"
         add_contours(axes[i], int(ch[2]), GRDR_data_pj, samples_per_rot, num_spins, overlay_type)
+        axes[i].set_title(ch)
     fig.tight_layout()
     fig.savefig(f"MWR_banana_{params_str}_{overlay_type}.png", dpi=300)
 

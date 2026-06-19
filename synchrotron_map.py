@@ -94,7 +94,7 @@ def stack_data(data: np.ndarray) -> np.ndarray:
     return np.nanmedian(data, axis=2)
 
 
-def plot_swath(data: np.ndarray, params_str: str, type: str):
+def plot_swath(data: np.ndarray, chs: list, params_str: str, type: str):
     if type == "SIII":
         flip = 'astro'
         xtick_labels = range(180, -181, -30)
@@ -111,6 +111,7 @@ def plot_swath(data: np.ndarray, params_str: str, type: str):
         ax.set_yticks(range(-90, 91, 15))
         ax.grid()
         fig.colorbar(im, ax=ax)
+        ax.set_title(f"Ch{chs[i]}")
     fig.tight_layout()
     plt.show()
     fig.savefig(f"MWR_swath_{params_str}_{type}.png", dpi=300)
@@ -132,7 +133,7 @@ def main():
 
     time_series_data = compile_data(pjs, args.dt, chs, args.da, args.Rsync, args.type)
     stacked_data = stack_data(time_series_data)
-    plot_swath(stacked_data, f"PJs{args.PJs}_CHs{args.ch}_da{args.da}_dt{args.dt}_Rsync{args.Rsync}", args.type)
+    plot_swath(stacked_data, chs, f"PJs{args.PJs}_CHs{args.ch}_da{args.da}_dt{args.dt}_Rsync{args.Rsync}", args.type)
 
 
 if __name__ == "__main__":
