@@ -40,6 +40,11 @@ class FileDownloadError(Exception):
     pass
 
 
+class DownloadShortCircuitError(Exception):
+    # Raised when code attempts to pull files from existing directory but finds none
+    pass
+
+
 def find_file(filename: str, pj: int):
     for root, _, files in os.walk(DATA_DIR, f"PJ_{pj}"):
         if filename in files:
@@ -92,6 +97,21 @@ def PDS_query(t_min: datetime, t_max: datetime, pj: int) -> pd.DataFrame:
     return download_clean_data(PDS_data_df, pj)
 
 
+def PDS_query_short_circuit(t_min: datetime, t_max: datetime, pj: int, force: bool) -> pd.DataFrame:
+    pj_path = os.path.join(DATA_DIR, f"PJ_{pj}")
+    if force or not os.path.exists(pj_path):
+        return PDS_query(t_min, t_max, pj)
+    files_list = [fname for fname in os.listdir(pj_path) if os.path.isfile(os.path.join(pj_path, fname))]
+    if len(files_list) == 0:
+        raise FileDownloadError
+    GRDR_list = [os.path.join(pj_path, fname) for fname in files_list if 'RG' in fname]
+    IRDR_list = [os.path.join(pj_path, fname) for fname in files_list if 'RI' in fname]
+    assert len(GRDR_list) == len(IRDR_list), "Lists of GRDR and IRDR file paths should have the same length"
+    GRDR_list.sort()    # assumes file naming convention sorts in ascending time order
+    IRDR_list.sort()
+    return pd.DataFrame({'IRDR_CSV': IRDR_list, 'GRDR_CSV': GRDR_list})
+
+
 def download_data(PDS_data_df: pd.DataFrame, pj: int) -> pd.DataFrame:
     GRDR_list = []
     IRDR_list = []
@@ -136,9 +156,9 @@ def download_clean_data(PDS_data_df: pd.DataFrame, pj: int) -> pd.DataFrame:
     return sorted_filepaths_df
 
 
-def load_PJ_data(pj: int, dt: float, chs: np.ndarray, keep_cols_GRDR: list[str] = COLS_GRDR) -> tuple[pd.DataFrame, pd.DataFrame]:
-    t_min, t_max = get_tmin_tmax(pj, dt)        # PDS queries by time range
-    filepaths_df = PDS_query(t_min, t_max, pj)  # get list of filepaths
+def load_PJ_data(pj: int, dt: float, chs: np.ndarray, keep_cols_GRDR: list[str] = COLS_GRDR, force_query: bool = False) -> tuple[pd.DataFrame, pd.DataFrame]:
+    t_min, t_max = get_tmin_tmax(pj, dt)                                    # PDS queries by time range
+    filepaths_df = PDS_query_short_circuit(t_min, t_max, pj, force_query)   # get list of filepaths
     
     # read only the columns pertinent to this processing (e.g. channel specific -- does not change csv)
     keep_cols_IRDR = ['t_ephem_time', 't_utc_doy', *CHANNELS[chs - 1].tolist()]
