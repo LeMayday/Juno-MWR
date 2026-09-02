@@ -12,3 +12,4 @@ dependencies:
     - requests
     - pds.peppi
     - healpy
+    - JupiterMag
