@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import binned_statistic
 import healpy as hp
 import JupiterMag as jm
+from JupiterMag import TraceField
 
 # local files
 from plot_data import make_subplots
@@ -41,7 +42,7 @@ def find_lats_M(phi_vec, M, tol=1e-4):
     return theta_vec
 
 
-def pre_compute_mshell_traces(M, ntraces=100):
+def pre_compute_mshell_traces(M, ntraces=100) -> TraceField:
     jm.Con2020.Config(equation_type='analytic')
     phi = np.linspace(0, 2*np.pi, ntraces, endpoint=False)
     theta = find_lats_M(phi, M)
@@ -49,7 +50,7 @@ def pre_compute_mshell_traces(M, ntraces=100):
     y0 = np.sin(phi) * np.sin(theta)
     z0 = np.cos(theta)
     # see https://github.com/mattkjames7/JupiterMag/blob/a3fc24f20e0860296a11a55ee14f0e5f5e8fc577/JupiterMag/TraceField.py#L16 for args
-    T = jm.TraceField(x0, y0, z0, Verbose=True, IntModel='jrm33', ExtModel='Con2020')
+    return TraceField(x0, y0, z0, Verbose=False, IntModel='jrm33', ExtModel='Con2020', MaxStep=0.1)
 
 
 def main():
