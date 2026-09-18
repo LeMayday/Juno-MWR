@@ -15,6 +15,47 @@ from synchrotron_map import parse_PJs, COLS_GRDR_MAP, RJ
 # default
 import argparse
 
+TWO_D_NDArray = np.ndarray[tuple[int, int], np.dtype[np.float32]]
+THREE_D_NDArray = np.ndarray[tuple[int, int, int], np.dtype[np.float32]]
+
+
+def B(X, Y, Z):
+    jm.Con2020.Config(equation_type='analytic')
+    jm.Internal.Config(Model="jrm33", CartesianIn=True, CartesianOut=True)
+    Bx, By, Bz = jm.Internal.Field(X, Y, Z) + jm.Con2020.Field(X, Y, Z)
+    return Bx, By, Bz
+
+
+def B_field_mesh(M_max: float, N: float = 120):
+    x_vec = np.linspace(-M_max, M_max, N)
+    y_vec = np.linspace(-M_max, M_max, N)
+    z_vec = np.linspace(-M_max*2/3, M_max*2/3, N*2//3)
+    X, Y, Z = np.meshgrid(x_vec, y_vec, z_vec, indexing='ij', dtype=np.float32)
+
+    Bx, By, Bz = B(X, Y, Z)
+
+    TFeq = TraceField(X, Y, Z, Verbose=False, IntModel='jrm33', ExtModel='Con2020').equator
+    Xeq, Yeq, Zeq = TFeq.x3, TFeq.y3, TFeq.z3
+    Bx_eq, By_eq, Bz_eq = B(Xeq, Yeq, Zeq)
+    M_shell = TFeq.mshell
+    return X, Y, Z, Bx, By, Bz, Bx_eq, By_eq, Bz_eq, M_shell
+
+
+def m_shell_intersect(X: THREE_D_NDArray, Y: THREE_D_NDArray, Z: THREE_D_NDArray, M_shell: THREE_D_NDArray, r_sc: TWO_D_NDArray, r_b: TWO_D_NDArray, M: float, N: float = 120):
+    # get points w/in m-shell
+    dM = 0.05
+    M_shell_mask = np.logical_and(M_shell > M - dM, M_shell < M + dM)
+
+    s = np.linspace(0, M*1.2, N*2, dtype=np.float32)[None, :]   # go from S/C position past M-shell and sample more frequently than grid spacing
+    # r_sc and r_b are both num samples x 3 arrays
+    P = np.stack((X, Y, Z), axis=-1)    # N * N * N*2/3 * 3
+    r_mesh = P - r_sc.T                 # (...) - 3 * num samples
+
+    # get points where ((x,y,z) - r_sc) dot r_b ~ 1
+    los_mask = np.einsum('ijklm,ml->ijkm', r_mesh, r_b) > np.cos(np.deg2rad(5))
+    # points on M-shell intersected by LOS for each sample
+    return np.logical_and(M_shell_mask[:, :, :, None], los_mask)
+
 
 def find_lats_M(phi_vec, M, tol=1e-4):
     theta = np.arcsin(np.sqrt(1/M))                                 # r/R = 1 = M cos^2(lat)
