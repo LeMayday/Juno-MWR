@@ -26,37 +26,6 @@ def B(X, Y, Z):
     return Bx, By, Bz
 
 
-def B_field_mesh(M_max: float, N: float = 120):
-    x_vec = np.linspace(-M_max, M_max, N)
-    y_vec = np.linspace(-M_max, M_max, N)
-    z_vec = np.linspace(-M_max*2/3, M_max*2/3, N*2//3)
-    X, Y, Z = np.meshgrid(x_vec, y_vec, z_vec, indexing='ij', dtype=np.float32)
-
-    Bx, By, Bz = B(X, Y, Z)
-
-    TFeq = TraceField(X, Y, Z, Verbose=False, IntModel='jrm33', ExtModel='Con2020').equator
-    Xeq, Yeq, Zeq = TFeq.x3, TFeq.y3, TFeq.z3
-    Bx_eq, By_eq, Bz_eq = B(Xeq, Yeq, Zeq)
-    M_shell = TFeq.mshell
-    return X, Y, Z, Bx, By, Bz, Bx_eq, By_eq, Bz_eq, M_shell
-
-
-def m_shell_intersect(X: THREE_D_NDArray, Y: THREE_D_NDArray, Z: THREE_D_NDArray, M_shell: THREE_D_NDArray, r_sc: TWO_D_NDArray, r_b: TWO_D_NDArray, M: float, N: float = 120):
-    # get points w/in m-shell
-    dM = 0.05
-    M_shell_mask = np.logical_and(M_shell > M - dM, M_shell < M + dM)
-
-    s = np.linspace(0, M*1.2, N*2, dtype=np.float32)[None, :]   # go from S/C position past M-shell and sample more frequently than grid spacing
-    # r_sc and r_b are both num samples x 3 arrays
-    P = np.stack((X, Y, Z), axis=-1)    # N * N * N*2/3 * 3
-    r_mesh = P - r_sc.T                 # (...) - 3 * num samples
-
-    # get points where ((x,y,z) - r_sc) dot r_b ~ 1
-    los_mask = np.einsum('ijklm,ml->ijkm', r_mesh, r_b) > np.cos(np.deg2rad(5))
-    # points on M-shell intersected by LOS for each sample
-    return np.logical_and(M_shell_mask[:, :, :, None], los_mask)
-
-
 def find_lats_M(phi_vec, M, tol=1e-4):
     theta = np.arcsin(np.sqrt(1/M))                                 # r/R = 1 = M cos^2(lat)
     theta_vec = np.full_like(phi_vec, theta)
@@ -83,7 +52,7 @@ def find_lats_M(phi_vec, M, tol=1e-4):
     return theta_vec
 
 
-def pre_compute_mshell_traces(M, ntraces=100) -> TraceField:
+def pre_compute_mshell_traces(M: float, ntraces: int = 100) -> TraceField:
     jm.Con2020.Config(equation_type='analytic')
     phi = np.linspace(0, 2*np.pi, ntraces, endpoint=False)
     theta = find_lats_M(phi, M)
@@ -94,34 +63,42 @@ def pre_compute_mshell_traces(M, ntraces=100) -> TraceField:
     return TraceField(x0, y0, z0, Verbose=False, IntModel='jrm33', ExtModel='Con2020', MaxStep=0.1)
 
 
-def find_intersections(T: TraceField, r_sc: np.ndarray, r_b: np.ndarray):
+def intersect_w_alphaeq_lon(T: TraceField, r_sc: TWO_D_NDArray, r_b: TWO_D_NDArray):
     # return positions, B fields, and pitch angles at intersections
     # r_sc is vector of normalized S/C pos vectors in SIII
-    # r_los is vector of normalized boresight vectors in SIII
+    # r_b is vector of normalized boresight vectors in SIII
+    r_mesh = np.stack((T.x, T.y, T.z), axis=-1).astype(np.float32)          # ntraces x 1000 pts per trace x 3
+    max_trace = np.max(np.sum(~np.isnan(r_mesh), axis=1))                   # the max non nan entries in any column
+    r_mesh = r_mesh[:, :max_trace, :]
+    r_mesh_collapsed = np.reshape(r_mesh, (-1, 3))                          # num mesh pts x 3
+    r_mesh_sc = r_mesh_collapsed[:, None, :] - r_sc                         # num mesh pts x num samples x 3
 
-    r_b = r_b.astype(np.float32)
-    r_sc = r_sc.astype(np.float32)
-    r_los = (r_b - r_sc)                                                # num samples x 3
-    r_los = r_los / np.linalg.norm(r_los, axis=-1, keepdims=True)
-    r_M = np.stack((T.x, T.y, T.z), axis=-1).astype(np.float32)         # ntraces x 1000 pts per trace x 3
-    max_trace = np.max(np.sum(~np.isnan(r_M), axis=1))
-    r_M = r_M[:, :max_trace, :]
-    r_M_collapsed = np.reshape(r_M, (-1, 3))                            # num mesh pts x 3
-    r_M_sc = r_M_collapsed[:, None, :] - r_sc                           # num mesh pts x num samples x 3
-    parallel_comp = np.einsum('ijk,jk->ij', r_M_sc, r_los)
-    perp_vecs = r_M_sc - parallel_comp[..., None] * r_los
-    perp_dist_sq = np.einsum('ijk,ijk->ji', perp_vecs, perp_vecs)       # num samples x num mesh pts
-    closest_mesh = np.nanargmin(perp_dist_sq, axis=-1)
-    closest_mesh_vecs = r_M_collapsed[closest_mesh, :]                  # num samples x 3
-    _, SIII_longitudes = lat_lonW(*closest_mesh_vecs.T)
+    # get points where ((x,y,z) - r_sc) dot r_b is maximized
+    r_mesh_sc_norm = r_mesh_sc / np.linalg.norm(r_mesh_sc, axis=-1, keepdims=True)
+    los_mask = np.nanargmax(np.einsum('ijk,jk->ij', r_mesh_sc_norm, r_b), axis=0)   # num samples -- take max over mesh pts
 
-    B_M = np.stack((T.Bx, T.By, T.Bz), axis=-1).astype(np.float32)
-    B_M = B_M[:, :max_trace, :]
-    B_M_collapsed = np.reshape(r_M, (-1, 3))                            # num mesh pts x 3
-    B_vecs = B_M_collapsed[closest_mesh, :]                             # num samples x 3
-    pitch_angles = np.acos(np.einsum('ij,ij->i', r_los, B_vecs))
-
+    # need B field to take dot product to get alpha
+    # need equatorial B field to get alpha_eq using B, Beq, alpha
+    # need longitude
+    B_mesh = np.stack((T.Bx, T.By, T.Bz), axis=-1).astype(np.float32)
+    B_mesh = B_mesh[:, :max_trace, :]
+    B_mesh_collapsed = np.reshape(B_mesh, (-1, 3))                          # num mesh pts x 3
+    B_data = B_mesh_collapsed[los_mask, :]                                  # num samples x 3
+    b_data = B_data / np.linalg.norm(B_data, axis=-1, keepdims=True)
+    alpha_data = np.acos(np.einsum('ij,ij->i', b_data, r_b))                # num samples
     
+    Xeq, Yeq, Zeq = T.equator.x3, T.equator.y3, T.equator.z3                # ntraces
+    Bx_eq, By_eq, Bz_eq = B(Xeq, Yeq, Zeq)
+    B_eq_vec = np.stack((Bx_eq, By_eq, Bz_eq), axis=-1).astype(np.float32)  # ntraces x 3
+    # need to convert from collapsed indices in los_mask to ntraces
+    trace_mask = los_mask // max_trace
+    B_eq_data = B_eq_vec[trace_mask, :]                                     # num samples x 3
+    # sin(alpha) / B^2 = sin(alpha_eq) / Beq^2
+    alpha_eq_data = np.asin(np.sin(alpha_data) * np.einsum('ij,ij->i', B_data, B_data) / np.einsum('ij,ij->i', B_eq_data, B_eq_data))   # num samples
+
+    lon_m = T.equator.mlone[trace_mask]                                     # num samples, lon in degrees!
+    return alpha_eq_data, lon_m
+
 
 def compile_data(pjs: list[int], dt: int, chs: np.ndarray, nside: int = 128) -> np.ndarray:
     # healpix has pixels ordered by index, so (lat, lon) -> (npix)
