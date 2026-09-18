@@ -1,22 +1,24 @@
 # modules
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats import binned_statistic
-import healpy as hp
+from scipy.stats import binned_statistic_2d
 import JupiterMag as jm
 from JupiterMag import TraceField
 
 # local files
 from plot_data import make_subplots
 from PDS_helper import load_PJ_data, NoProductsError, FileDownloadError, DownloadShortCircuitError
-from coordinates import lat_lonW, lat_lonE
-from synchrotron_map import parse_PJs, COLS_GRDR_MAP, RJ
+from synchrotron_map import parse_PJs, RJ
 
 # default
 import argparse
 
 TWO_D_NDArray = np.ndarray[tuple[int, int], np.dtype[np.float32]]
 THREE_D_NDArray = np.ndarray[tuple[int, int, int], np.dtype[np.float32]]
+COLS_GRDR = ['t_ephem_time', 't_utc_doy',
+             'PC_lon_JsB1', 'PC_lon_JsB2',
+             'S3RH_x_B1', 'S3RH_y_B1', 'S3RH_z_B1', 'S3RH_x_B2', 'S3RH_y_B2', 'S3RH_z_B2',
+             'range_JnJc', 'S3RH_x_JcJn', 'S3RH_y_JcJn', 'S3RH_z_JcJn']
 
 
 def B(X, Y, Z):
@@ -100,27 +102,61 @@ def intersect_w_alphaeq_lon(T: TraceField, r_sc: TWO_D_NDArray, r_b: TWO_D_NDArr
     return alpha_eq_data, lon_m
 
 
-def compile_data(pjs: list[int], dt: int, chs: np.ndarray, nside: int = 128) -> np.ndarray:
-    # healpix has pixels ordered by index, so (lat, lon) -> (npix)
-    # see https://lambda.gsfc.nasa.gov/toolbox/pixelcoords.html for nside -> npix
-    # create numpy array that is (#chs, #pix, #pjs) so i can take median over pjs
-    out = np.empty((len(chs), hp.nside2npix(nside), len(pjs)))
+def compile_data(pjs: list[int], dt: int, chs: np.ndarray) -> np.ndarray:
+    # create numpy array that is (#chs, #alpha, #lon, #pjs) so i can take median over pjs
+    out = np.empty((len(chs), 90, 360, len(pjs)))
     out[:] = np.nan     # initialize as NaNs
-    M3_T = pre_compute_mshell_traces(3)
+    M = 3
+    ntraces = 100
+    M_trace = pre_compute_mshell_traces(M, ntraces)
     for i, pj in enumerate(pjs):
         try:
-            IRDR_data_pj, GRDR_data_pj = load_PJ_data(pj, dt, chs, keep_cols_GRDR=COLS_GRDR_MAP)
+            IRDR_data_pj, GRDR_data_pj = load_PJ_data(pj, dt, chs, keep_cols_GRDR=COLS_GRDR)
         except (NoProductsError, FileDownloadError, DownloadShortCircuitError) as err:
             continue
         # grab relevant columns
-        Jn_SIII = GRDR_data_pj[['S3RH_x_JcJn', 'S3RH_y_JcJn', 'S3RH_z_JcJn']].to_numpy() / RJ
-        boresight_SIII_1 = GRDR_data_pj[['S3RH_x_B1', 'S3RH_y_B1', 'S3RH_z_B1']].to_numpy()  # normalized
-        boresight_SIII_2 = GRDR_data_pj[['S3RH_x_B2', 'S3RH_y_B2', 'S3RH_z_B2']].to_numpy()  # normalized
+        Jn_SIII = GRDR_data_pj[['S3RH_x_JcJn', 'S3RH_y_JcJn', 'S3RH_z_JcJn']].to_numpy(dtype=np.float32) / RJ   # normalized to Jupiter radius
+        boresight_SIII_1 = GRDR_data_pj[['S3RH_x_B1', 'S3RH_y_B1', 'S3RH_z_B1']].to_numpy(dtype=np.float32)     # normalized
+        boresight_SIII_2 = GRDR_data_pj[['S3RH_x_B2', 'S3RH_y_B2', 'S3RH_z_B2']].to_numpy(dtype=np.float32)     # normalized
 
+        # filter out views of Jupiter --- 12 deg/s, so ~1-2 sec for whole beam width to be off Jupiter -> 10-20 extra samples
+        n_extra = 15
         T_sc = TraceField(*Jn_SIII.T, IntModel='jrm33', ExtModel='Con2020')
-        w_in_mshell_mask = T_sc.equator.mshell < 3 * 0.95
+        in_mshell_mask = T_sc.equator.mshell < M * 0.95
 
-        find_intersections(M3_T, Jn_SIII, boresight_SIII_1)
+        jupiter_mask_ch1 = ~np.isnan(GRDR_data_pj["PC_lon_JsB1"].to_numpy())                                # masks for where antenna beam is looking at Jupiter
+        jupiter_mask_ch1 = np.convolve(jupiter_mask_ch1, np.ones(2*n_extra + 1).astype(bool), 'same')       # expand mask to include beamwidth
+        Jn_SIII_ch1 = Jn_SIII[np.logical_and(jupiter_mask_ch1, in_mshell_mask), :]                          # mask positions
+        mask1 = np.logical_and(jupiter_mask_ch1, in_mshell_mask)
+        boresight_SIII_1 = boresight_SIII_1[mask1, :]                                                       # mask boresights
+
+        jupiter_mask_ch2 = ~np.isnan(GRDR_data_pj["PC_lon_JsB2"].to_numpy())
+        jupiter_mask_ch2 = np.convolve(jupiter_mask_ch2, np.ones(2*n_extra + 1).astype(bool), 'same')
+        Jn_SIII_ch2 = Jn_SIII[np.logical_and(jupiter_mask_ch2, in_mshell_mask), :]                          # mask positions
+        mask2 = np.logical_and(jupiter_mask_ch2, in_mshell_mask)
+        boresight_SIII_2 = boresight_SIII_2[mask2, :]                                                       # mask boresights
+
+        for j, ch in enumerate(chs):
+            T_a = IRDR_data_pj[f"Ch{ch}"]   # antenna temperature
+            if ch == 1:
+                alphas, lons = intersect_w_alphaeq_lon(M_trace, Jn_SIII_ch1, boresight_SIII_1)
+                T_a = T_a[mask1]
+            else:
+                alphas, lons = intersect_w_alphaeq_lon(M_trace, Jn_SIII_ch2, boresight_SIII_2)
+                T_a = T_a[mask2]
+            assert T_a.shape == alphas.shape == lons.shape, "T_a, alphas, and lons must have same shape!"
+
+            binned_medians = bin_data(T_a, lons, alphas, ntraces)
+            out[j, :, :, i] = binned_medians     # everything else should still be NaN
+    return out
+
+
+def bin_data(T_a: np.ndarray, lons: np.ndarray, alphas: np.ndarray, ntraces: int) -> np.ndarray:
+    # longitudes in degrees!
+    phi_bins = np.linspace(0, 360, ntraces+1, endpoint=True) - 360 / ntraces
+    alpha_bins = np.arange(-0.5, 91.5, 1)   # from -0.5 to 90.5, exclude last point
+    mean, _, _, _ = binned_statistic_2d(x=lons, y=alphas, values=T_a, statistic="mean", bins=[phi_bins, alpha_bins])
+    return mean
 
 
 def main():
