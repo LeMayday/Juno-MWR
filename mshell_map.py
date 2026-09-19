@@ -132,13 +132,13 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
 
         jupiter_mask_ch1 = ~np.isnan(GRDR_data_pj["PC_lon_JsB1"].to_numpy())                                # masks for where antenna beam is looking at Jupiter
         jupiter_mask_ch1 = np.convolve(jupiter_mask_ch1, np.ones(2*n_extra + 1).astype(bool), 'same')       # expand mask to include beamwidth
-        mask1 = np.logical_and(jupiter_mask_ch1, pos_mask)
+        mask1 = np.logical_and(~jupiter_mask_ch1, pos_mask)
         Jn_SIII_ch1 = Jn_SIII[mask1, :]                                                                     # mask positions
         boresight_SIII_1 = boresight_SIII_1[mask1, :]                                                       # mask boresights
 
         jupiter_mask_ch2 = ~np.isnan(GRDR_data_pj["PC_lon_JsB2"].to_numpy())
         jupiter_mask_ch2 = np.convolve(jupiter_mask_ch2, np.ones(2*n_extra + 1).astype(bool), 'same')
-        mask2 = np.logical_and(jupiter_mask_ch2, pos_mask)
+        mask2 = np.logical_and(~jupiter_mask_ch2, pos_mask)
         Jn_SIII_ch2 = Jn_SIII[mask2, :]                                                                     # mask positions
         boresight_SIII_2 = boresight_SIII_2[mask2, :]                                                       # mask boresights
 
