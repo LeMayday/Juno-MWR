@@ -1,6 +1,7 @@
 # modules
 import numpy as np
 import matplotlib.pyplot as plt
+import pickle
 from scipy.stats import binned_statistic_2d
 import JupiterMag as jm
 from JupiterMag import TraceField
@@ -101,7 +102,25 @@ def intersect_w_alphaeq_lon(T: TraceField, r_sc: TWO_D_NDArray, r_b: TWO_D_NDArr
     alpha_eq_data = np.asin(np.sin(alpha_data) * np.sqrt(np.linalg.norm(B_eq_data, axis=-1) / np.linalg.norm(B_data, axis=-1)))   # num samples
 
     lon_m = np.rad2deg(T.equator.mlone[trace_mask]) + 180                   # num samples, lon in degrees!
+    plot_points(r_mesh_collapsed, r_sc, los_mask)
     return alpha_eq_data, lon_m
+
+
+def plot_points(r_mesh: TWO_D_NDArray, r_sc: TWO_D_NDArray, los_mask: np.ndarray):
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+    ax.plot(*r_sc.T, color='black')
+    # ax.scatter(*r_mesh.T, color='blue', marker='.')
+    ax.scatter(*(r_mesh[los_mask, :].T), color='red', marker='.', s=50)
+    th = np.linspace(0, np.pi, 50)
+    phi = np.linspace(0, 2*np.pi, 50)
+    x = np.outer(np.cos(phi), np.sin(th))
+    y = np.outer(np.sin(phi), np.sin(th))
+    z = np.outer(np.ones(np.size(phi)), np.cos(th))
+
+    ax.plot_surface(x, y, z, edgecolor='None')
+    with open("my_interactive_plot.pickle", "wb") as f:
+        pickle.dump(fig, f)
 
 
 def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: int) -> np.ndarray:
