@@ -91,7 +91,7 @@ def bin_data(T_a: np.ndarray, true_lat: np.ndarray, true_lon: np.ndarray, nside)
 
 def stack_data(data: np.ndarray) -> np.ndarray:
     # assume data is (#chs, #pix, #pjs) -- take median of non-NaN entries over pj axis
-    return np.nanmedian(data, axis=2)
+    return np.nanmedian(data, axis=-1)
 
 
 def plot_swath(data: np.ndarray, chs: list, params_str: str, type: str):

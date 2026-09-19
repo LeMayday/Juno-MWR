@@ -8,7 +8,7 @@ from JupiterMag import TraceField
 # local files
 from plot_data import make_subplots
 from PDS_helper import load_PJ_data, NoProductsError, FileDownloadError, DownloadShortCircuitError
-from synchrotron_map import parse_PJs, RJ
+from synchrotron_map import parse_PJs, stack_data, RJ
 
 # default
 import argparse
@@ -102,12 +102,10 @@ def intersect_w_alphaeq_lon(T: TraceField, r_sc: TWO_D_NDArray, r_b: TWO_D_NDArr
     return alpha_eq_data, lon_m
 
 
-def compile_data(pjs: list[int], dt: int, chs: np.ndarray) -> np.ndarray:
+def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: int) -> np.ndarray:
     # create numpy array that is (#chs, #alpha, #lon, #pjs) so i can take median over pjs
-    out = np.empty((len(chs), 90, 360, len(pjs)))
+    out = np.empty((len(chs), 90, ntraces, len(pjs)))
     out[:] = np.nan     # initialize as NaNs
-    M = 3
-    ntraces = 100
     M_trace = pre_compute_mshell_traces(M, ntraces)
     for i, pj in enumerate(pjs):
         try:
@@ -153,9 +151,9 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray) -> np.ndarray:
 
 def bin_data(T_a: np.ndarray, lons: np.ndarray, alphas: np.ndarray, ntraces: int) -> np.ndarray:
     # longitudes in degrees!
-    phi_bins = np.linspace(0, 360, ntraces+1, endpoint=True) - 360 / ntraces
+    lon_bins = np.linspace(0, 360, ntraces+1, endpoint=True) - 360 / ntraces
     alpha_bins = np.arange(-0.5, 91.5, 1)   # from -0.5 to 90.5, exclude last point
-    mean, _, _, _ = binned_statistic_2d(x=lons, y=alphas, values=T_a, statistic="mean", bins=[phi_bins, alpha_bins])
+    mean, _, _, _ = binned_statistic_2d(x=lons, y=alphas, values=T_a, statistic="mean", bins=[lon_bins, alpha_bins])
     return mean
 
 
@@ -181,7 +179,11 @@ def main():
     for ch in chs: assert ch in range(1, 7), "Valid channel numbers are 1-6"
     pjs = parse_PJs(args.PJs)
     for pj in pjs: assert pj in range(1, 78), "Valid perijoves numbers are 1-77"
-    compile_data(pjs, args.dt, chs)
+
+    M=3
+    time_series_data = compile_data(pjs, args.dt, chs, M=M, ntraces=100)
+    stacked_data = stack_data(time_series_data)
+    plot_data(stacked_data, chs, f"PJs{args.PJs}_CHs{args.ch}_M{M}_dt{args.dt}")
 
 
 if __name__ == "__main__":
