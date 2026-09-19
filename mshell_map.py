@@ -97,7 +97,7 @@ def intersect_w_alphaeq_lon(T: TraceField, r_sc: TWO_D_NDArray, r_b: TWO_D_NDArr
     trace_mask = los_mask // max_trace
     B_eq_data = B_eq_vec[trace_mask, :]                                     # num samples x 3
     # sin(alpha) / B^2 = sin(alpha_eq) / Beq^2
-    alpha_eq_data = np.asin(np.sin(alpha_data) * np.einsum('ij,ij->i', B_data, B_data) / np.einsum('ij,ij->i', B_eq_data, B_eq_data))   # num samples
+    alpha_eq_data = np.asin(np.sin(alpha_data) * np.einsum('ij,ij->i', B_eq_data, B_eq_data) / np.einsum('ij,ij->i', B_data, B_data))   # num samples
 
     lon_m = T.equator.mlone[trace_mask]                                     # num samples, lon in degrees!
     return alpha_eq_data, lon_m
