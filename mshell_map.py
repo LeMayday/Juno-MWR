@@ -167,7 +167,7 @@ def plot_data(data: np.ndarray, chs: list, params_str: str):
         ax.set_title(f"Ch{chs[i]}")
     fig.tight_layout()
     plt.show()
-    fig.savefig(f"MWR_swath_{params_str}_{type}.png", dpi=300)
+    fig.savefig(f"MWR_swath_{params_str}.png", dpi=300)
 
 
 def main():
