@@ -125,7 +125,7 @@ def plot_points(r_mesh: TWO_D_NDArray, r_sc: TWO_D_NDArray, los_mask: np.ndarray
 
 def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: int) -> np.ndarray:
     # create numpy array that is (#chs, #alpha, #lon, #pjs) so i can take median over pjs
-    out = np.empty((len(chs), ntraces, 91, len(pjs)))
+    out = np.empty((len(chs), ntraces, 90, len(pjs)))
     out[:] = np.nan     # initialize as NaNs
     M_trace = pre_compute_mshell_traces(M, ntraces)
     max_lat = np.min([M_trace.ionosphere.latn, M_trace.surface.latn])
@@ -182,10 +182,10 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
 
 def bin_data(T_a: np.ndarray, lons: np.ndarray, alphas: np.ndarray, ntraces: int) -> np.ndarray:
     # longitudes in degrees!
-    lon_bins = np.linspace(0, 360, ntraces+1, endpoint=True) - 360 / ntraces
-    alpha_bins = np.arange(-0.5, 91.5, 1)   # from -0.5 to 90.5, exclude last point
-    mean, _, _, _ = binned_statistic_2d(x=lons, y=alphas, values=T_a, statistic="mean", bins=[lon_bins, alpha_bins])
-    return mean
+    lon_bins = np.linspace(0, 360, ntraces+1, endpoint=True)
+    alpha_bins = np.linspace(0, 90, 91, endpoint=True)
+    med, _, _, _ = binned_statistic_2d(x=lons, y=alphas, values=T_a, statistic="median", bins=[lon_bins, alpha_bins])
+    return med
 
 
 def plot_data(data: np.ndarray, chs: list, params_str: str):
