@@ -24,8 +24,9 @@ COLS_GRDR = ['t_ephem_time', 't_utc_doy',
 def B(X, Y, Z):
     jm.Con2020.Config(equation_type='analytic')
     jm.Internal.Config(Model="jrm33", CartesianIn=True, CartesianOut=True)
-    Bx, By, Bz = jm.Internal.Field(X, Y, Z) + jm.Con2020.Field(X, Y, Z)
-    return Bx, By, Bz
+    Bx_int, By_int, Bz_int = jm.Internal.Field(X, Y, Z)
+    Bx_ext, By_ext, Bz_ext = jm.Con2020.Field(X, Y, Z)
+    return Bx_int + Bx_ext, By_int + By_ext, Bz_int + Bz_ext
 
 
 def find_lats_M(phi_vec, M, tol=1e-4):
@@ -124,14 +125,14 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
 
         jupiter_mask_ch1 = ~np.isnan(GRDR_data_pj["PC_lon_JsB1"].to_numpy())                                # masks for where antenna beam is looking at Jupiter
         jupiter_mask_ch1 = np.convolve(jupiter_mask_ch1, np.ones(2*n_extra + 1).astype(bool), 'same')       # expand mask to include beamwidth
-        Jn_SIII_ch1 = Jn_SIII[np.logical_and(jupiter_mask_ch1, in_mshell_mask), :]                          # mask positions
         mask1 = np.logical_and(jupiter_mask_ch1, in_mshell_mask)
+        Jn_SIII_ch1 = Jn_SIII[mask1, :]                                                                     # mask positions
         boresight_SIII_1 = boresight_SIII_1[mask1, :]                                                       # mask boresights
 
         jupiter_mask_ch2 = ~np.isnan(GRDR_data_pj["PC_lon_JsB2"].to_numpy())
         jupiter_mask_ch2 = np.convolve(jupiter_mask_ch2, np.ones(2*n_extra + 1).astype(bool), 'same')
-        Jn_SIII_ch2 = Jn_SIII[np.logical_and(jupiter_mask_ch2, in_mshell_mask), :]                          # mask positions
         mask2 = np.logical_and(jupiter_mask_ch2, in_mshell_mask)
+        Jn_SIII_ch2 = Jn_SIII[mask2, :]                                                                     # mask positions
         boresight_SIII_2 = boresight_SIII_2[mask2, :]                                                       # mask boresights
 
         for j, ch in enumerate(chs):
