@@ -128,8 +128,8 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
     out = np.empty((len(chs), ntraces, 91, len(pjs)))
     out[:] = np.nan     # initialize as NaNs
     M_trace = pre_compute_mshell_traces(M, ntraces)
-    max_lat = np.max([M_trace.ionosphere.latn, M_trace.surface.latn])
-    min_lat = np.min([M_trace.ionosphere.lats, M_trace.surface.lats])
+    max_lat = np.min([M_trace.ionosphere.latn, M_trace.surface.latn])
+    min_lat = np.max([M_trace.ionosphere.lats, M_trace.surface.lats])
     for i, pj in enumerate(pjs):
         try:
             IRDR_data_pj, GRDR_data_pj = load_PJ_data(pj, dt, chs, keep_cols_GRDR=COLS_GRDR)
