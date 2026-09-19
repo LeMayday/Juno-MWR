@@ -9,6 +9,7 @@ from JupiterMag import TraceField
 from plot_data import make_subplots
 from PDS_helper import load_PJ_data, NoProductsError, FileDownloadError, DownloadShortCircuitError
 from synchrotron_map import parse_PJs, stack_data, RJ
+from coordinates import lat_lonW
 
 # default
 import argparse
@@ -108,6 +109,8 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
     out = np.empty((len(chs), ntraces, 91, len(pjs)))
     out[:] = np.nan     # initialize as NaNs
     M_trace = pre_compute_mshell_traces(M, ntraces)
+    max_lat = np.max([M_trace.ionosphere.latn, M_trace.surface.latn])
+    min_lat = np.min([M_trace.ionosphere.lats, M_trace.surface.lats])
     for i, pj in enumerate(pjs):
         try:
             IRDR_data_pj, GRDR_data_pj = load_PJ_data(pj, dt, chs, keep_cols_GRDR=COLS_GRDR)
@@ -115,6 +118,9 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
             continue
         # grab relevant columns
         Jn_SIII = GRDR_data_pj[['S3RH_x_JcJn', 'S3RH_y_JcJn', 'S3RH_z_JcJn']].to_numpy(dtype=np.float32) / RJ   # normalized to Jupiter radius
+        Jn_SIII_norm = Jn_SIII / np.linalg.norm(Jn_SIII, axis=-1, keepdims=True)
+        lat, _ = lat_lonW(*Jn_SIII_norm.T)
+        lat_mask = np.logical_and(lat > min_lat, lat < max_lat)
         boresight_SIII_1 = GRDR_data_pj[['S3RH_x_B1', 'S3RH_y_B1', 'S3RH_z_B1']].to_numpy(dtype=np.float32)     # normalized
         boresight_SIII_2 = GRDR_data_pj[['S3RH_x_B2', 'S3RH_y_B2', 'S3RH_z_B2']].to_numpy(dtype=np.float32)     # normalized
 
@@ -122,16 +128,17 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
         n_extra = 15
         T_sc = TraceField(*Jn_SIII.T, IntModel='jrm33', ExtModel='Con2020')
         in_mshell_mask = T_sc.equator.mshell < M * 0.95
+        pos_mask = np.logical_and(lat_mask, in_mshell_mask)
 
         jupiter_mask_ch1 = ~np.isnan(GRDR_data_pj["PC_lon_JsB1"].to_numpy())                                # masks for where antenna beam is looking at Jupiter
         jupiter_mask_ch1 = np.convolve(jupiter_mask_ch1, np.ones(2*n_extra + 1).astype(bool), 'same')       # expand mask to include beamwidth
-        mask1 = np.logical_and(jupiter_mask_ch1, in_mshell_mask)
+        mask1 = np.logical_and(jupiter_mask_ch1, pos_mask)
         Jn_SIII_ch1 = Jn_SIII[mask1, :]                                                                     # mask positions
         boresight_SIII_1 = boresight_SIII_1[mask1, :]                                                       # mask boresights
 
         jupiter_mask_ch2 = ~np.isnan(GRDR_data_pj["PC_lon_JsB2"].to_numpy())
         jupiter_mask_ch2 = np.convolve(jupiter_mask_ch2, np.ones(2*n_extra + 1).astype(bool), 'same')
-        mask2 = np.logical_and(jupiter_mask_ch2, in_mshell_mask)
+        mask2 = np.logical_and(jupiter_mask_ch2, pos_mask)
         Jn_SIII_ch2 = Jn_SIII[mask2, :]                                                                     # mask positions
         boresight_SIII_2 = boresight_SIII_2[mask2, :]                                                       # mask boresights
 
