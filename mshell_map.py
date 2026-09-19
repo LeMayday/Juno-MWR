@@ -100,7 +100,7 @@ def intersect_w_alphaeq_lon(T: TraceField, r_sc: TWO_D_NDArray, r_b: TWO_D_NDArr
     # sin^2(alpha) / B = sin^2(alpha_eq) / Beq
     alpha_eq_data = np.asin(np.sin(alpha_data) * np.sqrt(np.linalg.norm(B_eq_data, axis=-1) / np.linalg.norm(B_data, axis=-1)))   # num samples
 
-    lon_m = T.equator.mlone[trace_mask]                                     # num samples, lon in degrees!
+    lon_m = np.rad2deg(T.equator.mlone[trace_mask]) + 180                   # num samples, lon in degrees!
     return alpha_eq_data, lon_m
 
 
