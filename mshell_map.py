@@ -105,7 +105,7 @@ def intersect_w_alphaeq_lon(T: TraceField, r_sc: TWO_D_NDArray, r_b: TWO_D_NDArr
 
 def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: int) -> np.ndarray:
     # create numpy array that is (#chs, #alpha, #lon, #pjs) so i can take median over pjs
-    out = np.empty((len(chs), 90, ntraces, len(pjs)))
+    out = np.empty((len(chs), ntraces, 91, len(pjs)))
     out[:] = np.nan     # initialize as NaNs
     M_trace = pre_compute_mshell_traces(M, ntraces)
     for i, pj in enumerate(pjs):
