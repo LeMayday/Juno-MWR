@@ -145,7 +145,7 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
                 T_a = T_a[mask2]
             assert T_a.shape == alphas.shape == lons.shape, "T_a, alphas, and lons must have same shape!"
 
-            binned_medians = bin_data(T_a, lons, alphas, ntraces)
+            binned_medians = bin_data(T_a, lons, np.rad2deg(alphas), ntraces)
             out[j, :, :, i] = binned_medians     # everything else should still be NaN
     return out
 
