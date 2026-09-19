@@ -142,13 +142,17 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
         Jn_SIII_ch2 = Jn_SIII[mask2, :]                                                                     # mask positions
         boresight_SIII_2 = boresight_SIII_2[mask2, :]                                                       # mask boresights
 
+        if 1 in chs:
+            alphas1, lons1 = intersect_w_alphaeq_lon(M_trace, Jn_SIII_ch1, boresight_SIII_1)
+        if (len(chs) == 1 and chs[0] != 1) or len(chs) > 1:
+            alphas2, lons2 = intersect_w_alphaeq_lon(M_trace, Jn_SIII_ch2, boresight_SIII_2)
         for j, ch in enumerate(chs):
             T_a = IRDR_data_pj[f"Ch{ch}"]   # antenna temperature
             if ch == 1:
-                alphas, lons = intersect_w_alphaeq_lon(M_trace, Jn_SIII_ch1, boresight_SIII_1)
+                alphas = alphas1; lons = lons1
                 T_a = T_a[mask1]
             else:
-                alphas, lons = intersect_w_alphaeq_lon(M_trace, Jn_SIII_ch2, boresight_SIII_2)
+                alphas = alphas2; lons = lons2
                 T_a = T_a[mask2]
             assert T_a.shape == alphas.shape == lons.shape, "T_a, alphas, and lons must have same shape!"
 
