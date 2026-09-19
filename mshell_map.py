@@ -159,6 +159,18 @@ def bin_data(T_a: np.ndarray, lons: np.ndarray, alphas: np.ndarray, ntraces: int
     return mean
 
 
+def plot_data(data: np.ndarray, chs: list, params_str: str):
+    fig = plt.figure(figsize=(18,8))
+    axes = make_subplots(fig, data.shape[0])
+    for i, ax in enumerate(axes):
+        im = ax.imshow(data[i, :], origin='lower', cmap='gist_ncar', aspect='auto', extent=[0, 360, 0, 90])
+        fig.colorbar(im, ax=ax)
+        ax.set_title(f"Ch{chs[i]}")
+    fig.tight_layout()
+    plt.show()
+    fig.savefig(f"MWR_swath_{params_str}_{type}.png", dpi=300)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dt", required=True, type=float, help="Delta time around each perijove in minutes")
