@@ -102,7 +102,7 @@ def intersect_w_alphaeq_lon(T: TraceField, r_sc: TWO_D_NDArray, r_b: TWO_D_NDArr
     alpha_eq_data = np.asin(np.sin(alpha_data) * np.sqrt(np.linalg.norm(B_eq_data, axis=-1) / np.linalg.norm(B_data, axis=-1)))   # num samples
 
     lon_m = np.rad2deg(T.equator.mlone[trace_mask]) + 180                   # num samples, lon in degrees!
-    plot_points(r_mesh_collapsed, r_sc, los_mask)
+    # plot_points(r_mesh_collapsed, r_sc, los_mask)
     return alpha_eq_data, lon_m
 
 
@@ -131,6 +131,7 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
     max_lat = np.min([M_trace.ionosphere.latn, M_trace.surface.latn])
     min_lat = np.max([M_trace.ionosphere.lats, M_trace.surface.lats])
     for i, pj in enumerate(pjs):
+        print(f"Loading PJ {pj}")
         try:
             IRDR_data_pj, GRDR_data_pj = load_PJ_data(pj, dt, chs, keep_cols_GRDR=COLS_GRDR)
         except (NoProductsError, FileDownloadError, DownloadShortCircuitError) as err:
@@ -196,7 +197,6 @@ def plot_data(data: np.ndarray, chs: list, params_str: str):
         fig.colorbar(im, ax=ax)
         ax.set_title(f"Ch{chs[i]}")
     fig.tight_layout()
-    plt.show()
     fig.savefig(f"MWR_swath_{params_str}.png", dpi=300)
 
 
