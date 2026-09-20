@@ -26,6 +26,12 @@ COLS_GRDR = ['t_ephem_time', 't_utc_doy',
              'range_JnJc', 'S3RH_x_JcJn', 'S3RH_y_JcJn', 'S3RH_z_JcJn']
 
 
+def batch_data(data: np.ndarray) -> list[np.ndarray]:
+    size = data.shape[0]
+    batch_size = max(500, int(np.ceil(size / MAX_WORKERS)))                 # ceiling division to prevent missing remainder, with 500 as smallest size
+    return [data[i:i + batch_size] for i in range(0, size, batch_size)]
+
+
 def intersect_w_alphaeq_lon(T: TraceField, r_sc: TWO_D_NDArray, r_b: TWO_D_NDArray):
     # return positions, B fields, and pitch angles at intersections
     # r_sc is vector of normalized S/C pos vectors in SIII
@@ -109,9 +115,7 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
 
             print("Filtering")
             # filter out views of Jupiter --- 12 deg/s, so ~1-2 sec for whole beam width to be off Jupiter -> 10-20 extra samples
-            batch_size = max(500, int(np.ceil(Jn_SIII.shape[0] / MAX_WORKERS)))                                 # ceiling division to prevent missing remainder, with 500 as smallest size
-            batches = [Jn_SIII[i:i + batch_size] for i in range(0, Jn_SIII.shape[0], batch_size)]
-            mshell_batches = list(executor.map(trace_batch_mshell, batches))
+            mshell_batches = list(executor.map(trace_batch_mshell, batch_data(Jn_SIII)))
             Jn_mshell = np.concatenate(mshell_batches)
             # T_sc = TraceField(*Jn_SIII.T, IntModel='jrm33', ExtModel='Con2020')
             in_mshell_mask = Jn_mshell < M * 0.95
