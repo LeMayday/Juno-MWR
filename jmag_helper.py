@@ -1,9 +1,11 @@
 # modules
 import numpy as np
 import JupiterMag as jm
-jm.Con2020.Config(equation_type='analytic')
 
 TWO_D_NDArray = np.ndarray[tuple[int, int], np.dtype[np.float32]]
+
+def init_Con2020_config():
+    jm.Con2020.Config(equation_type='analytic')
 
 
 def B(X, Y, Z):
