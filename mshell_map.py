@@ -179,16 +179,16 @@ def main():
     parser.add_argument("--dt", required=True, type=float, help="Delta time around each perijove in minutes")
     parser.add_argument("--ch", required=False, type=str, default="1,2,3,4,5,6", help="List of channels separated by comma")
     parser.add_argument("--PJs", required=True, type=str, help="Perijove range (e.g. 1,2,5,6 or 1-7 or 1,3-6)")
+    parser.add_argument("--M", required=True, type=float, help="M-shell")
     args = parser.parse_args()
     chs = np.array([int(ch) for ch in args.ch.split(',')])
     for ch in chs: assert ch in range(1, 7), "Valid channel numbers are 1-6"
     pjs = parse_PJs(args.PJs)
     for pj in pjs: assert pj in range(1, 78), "Valid perijoves numbers are 1-77"
 
-    M=3
-    time_series_data = compile_data(pjs, args.dt, chs, M=M, ntraces=100)
+    time_series_data = compile_data(pjs, args.dt, chs, M=args.M, ntraces=100)
     stacked_data = stack_data(time_series_data)
-    plot_data(stacked_data, chs, f"PJs{args.PJs}_CHs{args.ch}_M{M}_dt{args.dt}")
+    plot_data(stacked_data, chs, f"PJs{args.PJs}_CHs{args.ch}_M{args.M}_dt{args.dt}")
 
 
 if __name__ == "__main__":
