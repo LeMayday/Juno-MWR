@@ -9,12 +9,15 @@ from plot_data import make_subplots
 from PDS_helper import load_PJ_data, NoProductsError, FileDownloadError, DownloadShortCircuitError, BadPJError
 from synchrotron_map import parse_PJs, stack_data, RJ
 from coordinates import lat_lonW
-from jmag_helper import B, pre_compute_mshell_traces
+from jmag_helper import B, pre_compute_mshell_traces, trace_batch_mshell
 
 # default
 import argparse
 import pickle
+import concurrent.futures
+import os
 
+MAX_WORKERS = max(1, os.cpu_count() - 2)
 TWO_D_NDArray = np.ndarray[tuple[int, int], np.dtype[np.float32]]
 THREE_D_NDArray = np.ndarray[tuple[int, int, int], np.dtype[np.float32]]
 COLS_GRDR = ['t_ephem_time', 't_utc_doy',
@@ -86,57 +89,65 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
     max_lat = np.min([M_trace.ionosphere.latn, M_trace.surface.latn])
     min_lat = np.max([M_trace.ionosphere.lats, M_trace.surface.lats])
     skipped_PJs = []
-    for i, pj in enumerate(pjs):
-        print(f"Loading PJ {pj}")
-        try:
-            IRDR_data_pj, GRDR_data_pj = load_PJ_data(pj, dt, chs, keep_cols_GRDR=COLS_GRDR)
-        except (NoProductsError, FileDownloadError, DownloadShortCircuitError, BadPJError) as err:
-            skipped_PJs.append(pj)
-            continue
-        # grab relevant columns
-        Jn_SIII = GRDR_data_pj[['S3RH_x_JcJn', 'S3RH_y_JcJn', 'S3RH_z_JcJn']].to_numpy(dtype=np.float32) / RJ   # normalized to Jupiter radius
-        Jn_SIII_norm = Jn_SIII / np.linalg.norm(Jn_SIII, axis=-1, keepdims=True)
-        lat, _ = lat_lonW(*Jn_SIII_norm.T)
-        lat_mask = np.logical_and(lat > min_lat, lat < max_lat)
-        boresight_SIII_1 = GRDR_data_pj[['S3RH_x_B1', 'S3RH_y_B1', 'S3RH_z_B1']].to_numpy(dtype=np.float32)     # normalized
-        boresight_SIII_2 = GRDR_data_pj[['S3RH_x_B2', 'S3RH_y_B2', 'S3RH_z_B2']].to_numpy(dtype=np.float32)     # normalized
 
-        # filter out views of Jupiter --- 12 deg/s, so ~1-2 sec for whole beam width to be off Jupiter -> 10-20 extra samples
-        n_extra = 15
-        T_sc = TraceField(*Jn_SIII.T, IntModel='jrm33', ExtModel='Con2020')
-        in_mshell_mask = T_sc.equator.mshell < M * 0.95
-        pos_mask = np.logical_and(lat_mask, in_mshell_mask)
+    with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        for i, pj in enumerate(pjs):
+            print(f"Loading PJ {pj}")
+            try:
+                IRDR_data_pj, GRDR_data_pj = load_PJ_data(pj, dt, chs, keep_cols_GRDR=COLS_GRDR)
+            except (NoProductsError, FileDownloadError, DownloadShortCircuitError, BadPJError) as err:
+                print(f"Skipping PJ: {pj}")
+                skipped_PJs.append(pj)
+                continue
+            # grab relevant columns
+            Jn_SIII = GRDR_data_pj[['S3RH_x_JcJn', 'S3RH_y_JcJn', 'S3RH_z_JcJn']].to_numpy(dtype=np.float32) / RJ   # normalized to Jupiter radius
+            Jn_SIII_norm = Jn_SIII / np.linalg.norm(Jn_SIII, axis=-1, keepdims=True)
+            lat, _ = lat_lonW(*Jn_SIII_norm.T)
+            lat_mask = np.logical_and(lat > min_lat, lat < max_lat)
+            boresight_SIII_1 = GRDR_data_pj[['S3RH_x_B1', 'S3RH_y_B1', 'S3RH_z_B1']].to_numpy(dtype=np.float32)     # normalized
+            boresight_SIII_2 = GRDR_data_pj[['S3RH_x_B2', 'S3RH_y_B2', 'S3RH_z_B2']].to_numpy(dtype=np.float32)     # normalized
 
-        jupiter_mask_ch1 = ~np.isnan(GRDR_data_pj["PC_lon_JsB1"].to_numpy())                                # masks for where antenna beam is looking at Jupiter
-        jupiter_mask_ch1 = np.convolve(jupiter_mask_ch1, np.ones(2*n_extra + 1).astype(bool), 'same')       # expand mask to include beamwidth
-        mask1 = np.logical_and(~jupiter_mask_ch1, pos_mask)
-        Jn_SIII_ch1 = Jn_SIII[mask1, :]                                                                     # mask positions
-        boresight_SIII_1 = boresight_SIII_1[mask1, :]                                                       # mask boresights
+            print("Filtering")
+            # filter out views of Jupiter --- 12 deg/s, so ~1-2 sec for whole beam width to be off Jupiter -> 10-20 extra samples
+            batch_size = max(500, int(np.ceil(Jn_SIII.shape[0] / MAX_WORKERS)))                                 # ceiling division to prevent missing remainder, with 500 as smallest size
+            batches = [Jn_SIII[i:i + batch_size] for i in range(0, Jn_SIII.shape[0], batch_size)]
+            mshell_batches = list(executor.map(trace_batch_mshell, batches))
+            Jn_mshell = np.concatenate(mshell_batches)
+            # T_sc = TraceField(*Jn_SIII.T, IntModel='jrm33', ExtModel='Con2020')
+            in_mshell_mask = Jn_mshell < M * 0.95
+            pos_mask = np.logical_and(lat_mask, in_mshell_mask)
 
-        jupiter_mask_ch2 = ~np.isnan(GRDR_data_pj["PC_lon_JsB2"].to_numpy())
-        jupiter_mask_ch2 = np.convolve(jupiter_mask_ch2, np.ones(2*n_extra + 1).astype(bool), 'same')
-        mask2 = np.logical_and(~jupiter_mask_ch2, pos_mask)
-        Jn_SIII_ch2 = Jn_SIII[mask2, :]                                                                     # mask positions
-        boresight_SIII_2 = boresight_SIII_2[mask2, :]                                                       # mask boresights
+            n_extra = 15                                                                                        # 15 extra samples
+            jupiter_mask_ch1 = ~np.isnan(GRDR_data_pj["PC_lon_JsB1"].to_numpy())                                # masks for where antenna beam is looking at Jupiter
+            jupiter_mask_ch1 = np.convolve(jupiter_mask_ch1, np.ones(2*n_extra + 1).astype(bool), 'same')       # expand mask to include beamwidth
+            mask1 = np.logical_and(~jupiter_mask_ch1, pos_mask)
+            Jn_SIII_ch1 = Jn_SIII[mask1, :]                                                                     # mask positions
+            boresight_SIII_1 = boresight_SIII_1[mask1, :]                                                       # mask boresights
 
-        print("Calculating intersections")
-        if 1 in chs:
-            alphas1, lons1 = intersect_w_alphaeq_lon(M_trace, Jn_SIII_ch1, boresight_SIII_1)
-        if (len(chs) == 1 and chs[0] != 1) or len(chs) > 1:
-            alphas2, lons2 = intersect_w_alphaeq_lon(M_trace, Jn_SIII_ch2, boresight_SIII_2)
-        print("Binning")
-        for j, ch in enumerate(chs):
-            T_a = IRDR_data_pj[f"Ch{ch}"]   # antenna temperature
-            if ch == 1:
-                alphas = alphas1; lons = lons1
-                T_a = T_a[mask1]
-            else:
-                alphas = alphas2; lons = lons2
-                T_a = T_a[mask2]
-            assert T_a.shape == alphas.shape == lons.shape, "T_a, alphas, and lons must have same shape!"
+            jupiter_mask_ch2 = ~np.isnan(GRDR_data_pj["PC_lon_JsB2"].to_numpy())
+            jupiter_mask_ch2 = np.convolve(jupiter_mask_ch2, np.ones(2*n_extra + 1).astype(bool), 'same')
+            mask2 = np.logical_and(~jupiter_mask_ch2, pos_mask)
+            Jn_SIII_ch2 = Jn_SIII[mask2, :]                                                                     # mask positions
+            boresight_SIII_2 = boresight_SIII_2[mask2, :]                                                       # mask boresights
 
-            binned_medians = bin_data(T_a, lons, np.rad2deg(alphas), ntraces)
-            out[j, :, :, i] = binned_medians     # everything else should still be NaN
+            print("Calculating intersections")
+            if 1 in chs:
+                alphas1, lons1 = intersect_w_alphaeq_lon(M_trace, Jn_SIII_ch1, boresight_SIII_1)
+            if (len(chs) == 1 and chs[0] != 1) or len(chs) > 1:
+                alphas2, lons2 = intersect_w_alphaeq_lon(M_trace, Jn_SIII_ch2, boresight_SIII_2)
+            print("Binning")
+            for j, ch in enumerate(chs):
+                T_a = IRDR_data_pj[f"Ch{ch}"]   # antenna temperature
+                if ch == 1:
+                    alphas = alphas1; lons = lons1
+                    T_a = T_a[mask1]
+                else:
+                    alphas = alphas2; lons = lons2
+                    T_a = T_a[mask2]
+                assert T_a.shape == alphas.shape == lons.shape, "T_a, alphas, and lons must have same shape!"
+
+                binned_medians = bin_data(T_a, lons, np.rad2deg(alphas), ntraces)
+                out[j, :, :, i] = binned_medians     # everything else should still be NaN
     print(f"Data compilation finished. Skipped PJs: {skipped_PJs}")
     return out
 

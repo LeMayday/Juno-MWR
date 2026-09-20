@@ -13,6 +13,12 @@ def B(X, Y, Z):
     return Bx_int + Bx_ext, By_int + By_ext, Bz_int + Bz_ext
 
 
+def trace_batch_mshell(r: TWO_D_NDArray):
+    T = jm.TraceField(*r.T, IntModel='jrm33', ExtModel='Con2020')
+    mshells = np.array(T.equator.mshell, dtype=np.float32)
+    return mshells
+
+
 def find_lats_M(phi_vec, M, tol=1e-4):
     theta = np.arcsin(np.sqrt(1/M))                                 # r/R = 1 = M cos^2(lat)
     theta_vec = np.full_like(phi_vec, theta)
