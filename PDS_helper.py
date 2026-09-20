@@ -27,6 +27,7 @@ COLS_GRDR = ['t_ephem_time', 't_utc_doy',
              'JMag_x_B1', 'JMag_y_B1', 'JMag_z_B1', 'JMag_x_B2', 'JMag_y_B2', 'JMag_z_B2',
              'S3RH_x_B1', 'S3RH_y_B1', 'S3RH_z_B1', 'S3RH_x_B2', 'S3RH_y_B2', 'S3RH_z_B2',
              'range_JnJc', 'PC_lon_JsJnJc', 'PC_lat_JsJnJc', 'JMag_x_JcJn', 'JMag_y_JcJn', 'JMag_z_JcJn', 'S3RH_x_JcJn', 'S3RH_y_JcJn', 'S3RH_z_JcJn']
+BAD_PJS = [2, 55, 58, 62, 63, 64, 65, 68, 70, 71, 72, 73, 74, 75, 76, 77]
 
 
 class NoProductsError(Exception):
@@ -42,6 +43,11 @@ class FileDownloadError(Exception):
 
 class DownloadShortCircuitError(Exception):
     # Raised when code attempts to pull files from existing directory but finds none
+    pass
+
+
+class BadPJError(Exception):
+    # Raised when code attempts to pull files for a perijove that is known to cause problems
     pass
 
 
@@ -157,6 +163,8 @@ def download_clean_data(PDS_data_df: pd.DataFrame, pj: int) -> pd.DataFrame:
 
 
 def load_PJ_data(pj: int, dt: float, chs: np.ndarray, keep_cols_GRDR: list[str] = COLS_GRDR, force_query: bool = False) -> tuple[pd.DataFrame, pd.DataFrame]:
+    if pj in BAD_PJS:
+        raise BadPJError
     t_min, t_max = get_tmin_tmax(pj, dt)                                    # PDS queries by time range
     filepaths_df = PDS_query_short_circuit(t_min, t_max, pj, force_query)   # get list of filepaths
     

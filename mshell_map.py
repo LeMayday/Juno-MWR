@@ -8,7 +8,7 @@ from JupiterMag import TraceField
 
 # local files
 from plot_data import make_subplots
-from PDS_helper import load_PJ_data, NoProductsError, FileDownloadError, DownloadShortCircuitError
+from PDS_helper import load_PJ_data, NoProductsError, FileDownloadError, DownloadShortCircuitError, BadPJError
 from synchrotron_map import parse_PJs, stack_data, RJ
 from coordinates import lat_lonW
 
@@ -130,11 +130,13 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
     M_trace = pre_compute_mshell_traces(M, ntraces)
     max_lat = np.min([M_trace.ionosphere.latn, M_trace.surface.latn])
     min_lat = np.max([M_trace.ionosphere.lats, M_trace.surface.lats])
+    skipped_PJs = []
     for i, pj in enumerate(pjs):
         print(f"Loading PJ {pj}")
         try:
             IRDR_data_pj, GRDR_data_pj = load_PJ_data(pj, dt, chs, keep_cols_GRDR=COLS_GRDR)
-        except (NoProductsError, FileDownloadError, DownloadShortCircuitError) as err:
+        except (NoProductsError, FileDownloadError, DownloadShortCircuitError, BadPJError) as err:
+            skipped_PJs.append(pj)
             continue
         # grab relevant columns
         Jn_SIII = GRDR_data_pj[['S3RH_x_JcJn', 'S3RH_y_JcJn', 'S3RH_z_JcJn']].to_numpy(dtype=np.float32) / RJ   # normalized to Jupiter radius
@@ -162,10 +164,12 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
         Jn_SIII_ch2 = Jn_SIII[mask2, :]                                                                     # mask positions
         boresight_SIII_2 = boresight_SIII_2[mask2, :]                                                       # mask boresights
 
+        print("Calculating intersections")
         if 1 in chs:
             alphas1, lons1 = intersect_w_alphaeq_lon(M_trace, Jn_SIII_ch1, boresight_SIII_1)
         if (len(chs) == 1 and chs[0] != 1) or len(chs) > 1:
             alphas2, lons2 = intersect_w_alphaeq_lon(M_trace, Jn_SIII_ch2, boresight_SIII_2)
+        print("Binning")
         for j, ch in enumerate(chs):
             T_a = IRDR_data_pj[f"Ch{ch}"]   # antenna temperature
             if ch == 1:
@@ -178,6 +182,7 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
 
             binned_medians = bin_data(T_a, lons, np.rad2deg(alphas), ntraces)
             out[j, :, :, i] = binned_medians     # everything else should still be NaN
+    print(f"Data compilation finished. Skipped PJs: {skipped_PJs}")
     return out
 
 
