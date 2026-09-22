@@ -32,7 +32,7 @@ def batch_data(data: np.ndarray) -> list[np.ndarray]:
     return [data[i:i + batch_size] for i in range(0, size, batch_size)]
 
 
-def intersect_w_alphaeq_lon(T: TraceField, r_sc: TWO_D_NDArray, r_b: TWO_D_NDArray):
+def intersect_w_alphaeq_lon(T: TraceField, r_sc: TWO_D_NDArray, r_b: TWO_D_NDArray, pj: int):
     # return positions, B fields, and pitch angles at intersections
     # r_sc is vector of normalized S/C pos vectors in SIII
     # r_b is vector of normalized boresight vectors in SIII
@@ -66,24 +66,35 @@ def intersect_w_alphaeq_lon(T: TraceField, r_sc: TWO_D_NDArray, r_b: TWO_D_NDArr
     alpha_eq_data = np.asin(np.sin(alpha_data) * np.sqrt(np.linalg.norm(B_eq_data, axis=-1) / np.linalg.norm(B_data, axis=-1)))   # num samples
 
     lon_m = np.rad2deg(T.equator.mlone[trace_mask]) + 180                   # num samples, lon in degrees!
-    # plot_points(r_mesh_collapsed, r_sc, los_mask)
+    plot_points(r_mesh_collapsed, r_sc, los_mask)
     return alpha_eq_data, lon_m
 
 
-def plot_points(r_mesh: TWO_D_NDArray, r_sc: TWO_D_NDArray, los_mask: np.ndarray):
+def plot_points(r_mesh: TWO_D_NDArray, r_sc: TWO_D_NDArray, los_mask: np.ndarray, pj: int):
     fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
-    ax.plot(*r_sc.T, color='black')
-    # ax.scatter(*r_mesh.T, color='blue', marker='.')
-    ax.scatter(*(r_mesh[los_mask, :].T), color='red', marker='.', s=50)
+    ax1 = fig.add_subplot(121, projection='3d')
+    ax2 = fig.add_subplot(122, projection='3d')
+
+    # plot Jupiter
+    RJ_polar_ratio = 66,854 / RJ
     th = np.linspace(0, np.pi, 50)
     phi = np.linspace(0, 2*np.pi, 50)
     x = np.outer(np.cos(phi), np.sin(th))
     y = np.outer(np.sin(phi), np.sin(th))
-    z = np.outer(np.ones(np.size(phi)), np.cos(th))
+    z = np.outer(np.ones(np.size(phi)), np.cos(th)) / RJ_polar_ratio**2
+    ax1.plot_surface(x, y, z, edgecolor='None')
+    ax2.plot_surface(x, y, z, edgecolor='None')
 
-    ax.plot_surface(x, y, z, edgecolor='None')
-    with open("my_interactive_plot.pickle", "wb") as f:
+    # plot viewed points
+    ax1.scatter(*(r_mesh[los_mask, :].T), color='red', marker='.', s=50)
+    # plot M-shell mesh
+    ax2.scatter(*r_mesh.T, color='blue', marker='.')
+
+    # plot Juno trajectory
+    ax1.plot(*r_sc.T, color='black')
+    ax2.plot(*r_sc.T, color='black')
+
+    with open("pickle/interactive_plot_pj{pj}.pickle", "wb") as f:
         pickle.dump(fig, f)
 
 
@@ -97,7 +108,7 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
     skipped_PJs = []
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS, initializer=init_Con2020_config) as executor:
-        for i, pj in enumerate(pjs):
+        for pj in pjs:
             print(f"Loading PJ {pj}")
             try:
                 IRDR_data_pj, GRDR_data_pj = load_PJ_data(pj, dt, chs, keep_cols_GRDR=COLS_GRDR)
@@ -135,9 +146,9 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
 
             print("Calculating intersections")
             if 1 in chs:
-                alphas1, lons1 = intersect_w_alphaeq_lon(M_trace, Jn_SIII_ch1, boresight_SIII_1)
+                alphas1, lons1 = intersect_w_alphaeq_lon(M_trace, Jn_SIII_ch1, boresight_SIII_1, pj)
             if (len(chs) == 1 and chs[0] != 1) or len(chs) > 1:
-                alphas2, lons2 = intersect_w_alphaeq_lon(M_trace, Jn_SIII_ch2, boresight_SIII_2)
+                alphas2, lons2 = intersect_w_alphaeq_lon(M_trace, Jn_SIII_ch2, boresight_SIII_2, pj)
             print("Binning")
             for j, ch in enumerate(chs):
                 T_a = IRDR_data_pj[f"Ch{ch}"]   # antenna temperature
@@ -150,7 +161,7 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
                 assert T_a.shape == alphas.shape == lons.shape, "T_a, alphas, and lons must have same shape!"
 
                 binned_medians = bin_data(T_a, lons, np.rad2deg(alphas), ntraces)
-                out[j, :, :, i] = binned_medians     # everything else should still be NaN
+                out[j, :, :, pj-1] = binned_medians     # everything else should still be NaN
     print(f"Data compilation finished. Skipped PJs: {skipped_PJs}")
     return out
 
