@@ -150,7 +150,7 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
             if (len(chs) == 1 and chs[0] != 1) or len(chs) > 1:
                 alphas2, lons2 = intersect_w_alphaeq_lon(M_trace, Jn_SIII_ch2, boresight_SIII_2, pj)
             print("Binning")
-            for j, ch in enumerate(chs):
+            for ch in chs:
                 T_a = IRDR_data_pj[f"Ch{ch}"]   # antenna temperature
                 if ch == 1:
                     alphas = alphas1; lons = lons1
@@ -161,7 +161,7 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
                 assert T_a.shape == alphas.shape == lons.shape, "T_a, alphas, and lons must have same shape!"
 
                 binned_medians = bin_data(T_a, lons, np.rad2deg(alphas), ntraces)
-                out[j, :, :, pj-1] = binned_medians     # everything else should still be NaN
+                out[ch-1, :, :, pj-1] = binned_medians      # everything else should still be NaN
     print(f"Data compilation finished. Skipped PJs: {skipped_PJs}")
     return out
 
