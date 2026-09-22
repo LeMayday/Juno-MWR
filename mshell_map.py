@@ -66,7 +66,7 @@ def intersect_w_alphaeq_lon(T: TraceField, r_sc: TWO_D_NDArray, r_b: TWO_D_NDArr
     alpha_eq_data = np.asin(np.sin(alpha_data) * np.sqrt(np.linalg.norm(B_eq_data, axis=-1) / np.linalg.norm(B_data, axis=-1)))   # num samples
 
     lon_m = np.rad2deg(T.equator.mlone[trace_mask]) + 180                   # num samples, lon in degrees!
-    plot_points(r_mesh_collapsed, r_sc, los_mask)
+    plot_points(r_mesh_collapsed, r_sc, los_mask, pj)
     return alpha_eq_data, lon_m
 
 
@@ -76,7 +76,7 @@ def plot_points(r_mesh: TWO_D_NDArray, r_sc: TWO_D_NDArray, los_mask: np.ndarray
     ax2 = fig.add_subplot(122, projection='3d')
 
     # plot Jupiter
-    RJ_polar_ratio = 66,854 / RJ
+    RJ_polar_ratio = 66854 / RJ
     th = np.linspace(0, np.pi, 50)
     phi = np.linspace(0, 2*np.pi, 50)
     x = np.outer(np.cos(phi), np.sin(th))
