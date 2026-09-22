@@ -94,7 +94,7 @@ def plot_points(r_mesh: TWO_D_NDArray, r_sc: TWO_D_NDArray, los_mask: np.ndarray
     ax1.plot(*r_sc.T, color='black')
     ax2.plot(*r_sc.T, color='black')
 
-    with open("pickle/interactive_plot_pj{pj}.pickle", "wb") as f:
+    with open(f"pickle/interactive_plot_pj{pj}.pickle", "wb") as f:
         pickle.dump(fig, f)
 
 
