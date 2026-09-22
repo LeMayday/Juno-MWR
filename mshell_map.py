@@ -128,7 +128,7 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
             # filter out views of Jupiter --- 12 deg/s, so ~1-2 sec for whole beam width to be off Jupiter -> 10-20 extra samples
             mshell_batches = list(executor.map(trace_batch_mshell, batch_data(Jn_SIII)))
             Jn_mshell = np.concatenate(mshell_batches)
-            in_mshell_mask = np.logical_and(Jn_mshell > 1.01, Jn_mshell < M * 0.95)
+            in_mshell_mask = np.logical_and(Jn_mshell > 1.01, Jn_mshell < M * 0.98)
             pos_mask = np.logical_and(lat_mask, in_mshell_mask)
 
             n_extra = 15                                                                                        # 15 extra samples
