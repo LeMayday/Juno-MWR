@@ -181,8 +181,10 @@ def plot_data(data: np.ndarray, chs: list, params_str: str):
         im = ax.imshow(data[i, :].T, origin='lower', cmap='gist_ncar', aspect='auto', extent=[0, 360, 0, 90])
         fig.colorbar(im, ax=ax)
         ax.set_title(f"Ch{chs[i]}")
+        ax.set_xlabel("JRM33 Dipole Longitude")
+        ax.set_ylabel("$\\alpha_{eq}$")
     fig.tight_layout()
-    fig.savefig(f"MWR_swath_{params_str}.png", dpi=300)
+    fig.savefig(f"MWR_alpha_longitude_distribution_{params_str}.png", dpi=300)
 
 
 def main():
