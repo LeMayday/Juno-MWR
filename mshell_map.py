@@ -32,7 +32,7 @@ def batch_data(data: np.ndarray) -> list[np.ndarray]:
     return [data[i:i + batch_size] for i in range(0, size, batch_size)]
 
 
-def intersect_w_alphaeq_lon(T: TraceField, r_sc: TWO_D_NDArray, r_b: TWO_D_NDArray, pj: int):
+def intersect_w_alphaeq_lon(T: TraceField, r_sc: TWO_D_NDArray, r_b: TWO_D_NDArray, M: float, pj: int):
     # return positions, B fields, and pitch angles at intersections
     # r_sc is vector of normalized S/C pos vectors in SIII
     # r_b is vector of normalized boresight vectors in SIII
@@ -66,11 +66,11 @@ def intersect_w_alphaeq_lon(T: TraceField, r_sc: TWO_D_NDArray, r_b: TWO_D_NDArr
     alpha_eq_data = np.asin(np.sin(alpha_data) * np.sqrt(np.linalg.norm(B_eq_data, axis=-1) / np.linalg.norm(B_data, axis=-1)))   # num samples
 
     lon_m = np.rad2deg(T.equator.mlone[trace_mask]) + 180                   # num samples, lon in degrees!
-    plot_points(r_mesh_collapsed, r_sc, los_mask, pj)
+    plot_points(r_mesh_collapsed, r_sc, los_mask, M, pj)
     return alpha_eq_data, lon_m
 
 
-def plot_points(r_mesh: TWO_D_NDArray, r_sc: TWO_D_NDArray, los_mask: np.ndarray, pj: int):
+def plot_points(r_mesh: TWO_D_NDArray, r_sc: TWO_D_NDArray, los_mask: np.ndarray, M: float, pj: int):
     fig = plt.figure()
     ax1 = fig.add_subplot(121, projection='3d')
     ax2 = fig.add_subplot(122, projection='3d')
@@ -94,7 +94,7 @@ def plot_points(r_mesh: TWO_D_NDArray, r_sc: TWO_D_NDArray, los_mask: np.ndarray
     ax1.plot(*r_sc.T, color='black')
     ax2.plot(*r_sc.T, color='black')
 
-    with open(f"pickle/interactive_plot_pj{pj}.pickle", "wb") as f:
+    with open(f"pickle/interactive_plot_M{M}_pj{pj}.pickle", "wb") as f:
         pickle.dump(fig, f)
 
 
@@ -146,9 +146,9 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
 
             print("Calculating intersections")
             if 1 in chs:
-                alphas1, lons1 = intersect_w_alphaeq_lon(M_trace, Jn_SIII_ch1, boresight_SIII_1, pj)
+                alphas1, lons1 = intersect_w_alphaeq_lon(M_trace, Jn_SIII_ch1, boresight_SIII_1, M, pj)
             if (len(chs) == 1 and chs[0] != 1) or len(chs) > 1:
-                alphas2, lons2 = intersect_w_alphaeq_lon(M_trace, Jn_SIII_ch2, boresight_SIII_2, pj)
+                alphas2, lons2 = intersect_w_alphaeq_lon(M_trace, Jn_SIII_ch2, boresight_SIII_2, M, pj)
             print("Binning")
             for ch in chs:
                 T_a = IRDR_data_pj[f"Ch{ch}"]   # antenna temperature
@@ -192,16 +192,18 @@ def main():
     parser.add_argument("--dt", required=True, type=float, help="Delta time around each perijove in minutes")
     parser.add_argument("--ch", required=False, type=str, default="1,2,3,4,5,6", help="List of channels separated by comma")
     parser.add_argument("--PJs", required=True, type=str, help="Perijove range (e.g. 1,2,5,6 or 1-7 or 1,3-6)")
-    parser.add_argument("--M", required=True, type=float, help="M-shell")
+    parser.add_argument("--M", required=True, type=str, help="M-shell")
     args = parser.parse_args()
     chs = np.array([int(ch) for ch in args.ch.split(',')])
     for ch in chs: assert ch in range(1, 7), "Valid channel numbers are 1-6"
     pjs = parse_PJs(args.PJs)
     for pj in pjs: assert pj in range(1, 78), "Valid perijoves numbers are 1-77"
+    Ms = np.array([float(M) for M in args.M.split(',')])
 
-    time_series_data = compile_data(pjs, args.dt, chs, M=args.M, ntraces=100)
-    stacked_data = stack_data(time_series_data)
-    plot_data(stacked_data, chs, f"PJs{args.PJs}_CHs{args.ch}_M{args.M}_dt{args.dt}")
+    for M in Ms:
+        time_series_data = compile_data(pjs, args.dt, chs, M, ntraces=100)
+        stacked_data = stack_data(time_series_data)
+        plot_data(stacked_data, chs, f"PJs{args.PJs}_CHs{args.ch}_M{M}_dt{args.dt}")
 
 
 if __name__ == "__main__":
