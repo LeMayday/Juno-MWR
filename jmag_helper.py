@@ -21,7 +21,7 @@ def trace_batch_mshell(r: TWO_D_NDArray):
     return mshells
 
 
-def find_lats_M(phi_vec, M, tol=1e-4):
+def find_lats_M(phi_vec, M, tol=1e-3):
     theta = np.arcsin(np.sqrt(1/M))                                 # r/R = 1 = M cos^2(lat)
     theta_vec = np.full_like(phi_vec, theta)
 
@@ -37,10 +37,11 @@ def find_lats_M(phi_vec, M, tol=1e-4):
         if np.max(np.abs(res)) < tol:
             print(f"Newton-Raphson completed in {n} iterations.")
             break
+        meets_tol = np.abs(res) < tol
         overshoot = (prev_res * res) < 0
         damping[overshoot] *= 0.5                                   # fixes oscillations near magnetic great red spot
         step = res * np.tan(theta_vec) / (2 * M) * damping          # dM/dtheta
-        theta_vec += np.clip(step, -0.1, 0.1)
+        theta_vec[~meets_tol] += np.clip(step[~meets_tol], -0.1, 0.1)
         prev_res = np.copy(res)
         n += 1
 
