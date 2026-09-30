@@ -206,7 +206,9 @@ def main():
     for M in Ms:
         time_series_data = compile_data(pjs, args.dt, chs, M, ntraces=100)
         stacked_data = stack_data(time_series_data)
-        plot_data(stacked_data, chs, f"PJs{args.PJs}_CHs{args.ch}_M{M}_dt{args.dt}")
+        params_str = f"PJs{args.PJs}_CHs{args.ch}_M{M}_dt{args.dt}"
+        np.save(f"MWR_alpha_longitude_distribution_{params_str}.npy", stacked_data)
+        plot_data(stacked_data, chs, params_str)
 
 
 if __name__ == "__main__":
