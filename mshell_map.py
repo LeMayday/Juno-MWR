@@ -103,8 +103,8 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
     out = np.empty((len(chs), ntraces, 90, len(pjs)))
     out[:] = np.nan     # initialize as NaNs
     M_trace = pre_compute_mshell_traces(M, ntraces)
-    max_lat = np.min([M_trace.ionosphere.latn, M_trace.surface.latn])
-    min_lat = np.max([M_trace.ionosphere.lats, M_trace.surface.lats])
+    max_lat = 80#np.min([M_trace.ionosphere.latn, M_trace.surface.latn])
+    min_lat = -80#np.max([M_trace.ionosphere.lats, M_trace.surface.lats])
     skipped_PJs = []
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS, initializer=init_Con2020_config) as executor:
