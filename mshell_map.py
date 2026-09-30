@@ -174,11 +174,14 @@ def bin_data(T_a: np.ndarray, lons: np.ndarray, alphas: np.ndarray, ntraces: int
     return med
 
 
-def plot_data(data: np.ndarray, chs: list, params_str: str):
+def plot_data(data: np.ndarray, chs: list, params_str: str, vmax: list = None):
     fig = plt.figure(figsize=(18,8))
     axes = make_subplots(fig, data.shape[0])
     for i, ax in enumerate(axes):
-        im = ax.imshow(data[i, :].T, origin='lower', cmap='gist_ncar', aspect='auto', extent=[0, 360, 0, 90])
+        if vmax is not None:
+            im = ax.imshow(data[i, :].T, origin='lower', cmap='gist_ncar', vmin=0, vmax=vmax[i], aspect='auto', extent=[0, 360, 0, 90])
+        else:
+            im = ax.imshow(data[i, :].T, origin='lower', cmap='gist_ncar', aspect='auto', extent=[0, 360, 0, 90])
         fig.colorbar(im, ax=ax)
         ax.set_title(f"Ch{chs[i]}")
         ax.set_xlabel("JRM33 Dipole Longitude")
