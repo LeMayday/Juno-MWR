@@ -78,7 +78,7 @@ def generate_Bfield_mesh(M_max: float, N: float = 120):
     B_mesh_eq = B(TFeq.x3, TFeq.y3, TFeq.z3)
     Mshell = np.array(TFeq.mshell, dtype=np.float32)
     dipole_lon = np.rad2deg(np.array(TFeq.mlone, dtype=np.float32)) + 180
-    r_mesh = np.stack(X, Y, Z, axis=-1)
+    points = np.stack(x_vec, y_vec, z_vec, axis=0)
 
     jupiter_mask = X**2 + Y**2 + (Z / RJ_polar_ratio)**2 <= 1
     B_mesh[jupiter_mask, :] = np.nan
@@ -86,7 +86,7 @@ def generate_Bfield_mesh(M_max: float, N: float = 120):
     Mshell[jupiter_mask, :] = np.nan
     dipole_lon[jupiter_mask, :] = np.nan
 
-    np.savez("B-mesh_Mmax-{M_max}_N-{N}.npz", r_mesh=r_mesh, B_mesh=B_mesh, B_mesh_eq=B_mesh_eq, Mshell=Mshell, dipole_lon=dipole_lon)
+    np.savez("B-mesh_Mmax-{M_max}_N-{N}.npz", points=points, B_mesh=B_mesh, B_mesh_eq=B_mesh_eq, Mshell=Mshell, dipole_lon=dipole_lon)
 
 
 def main():
