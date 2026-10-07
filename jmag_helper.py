@@ -2,7 +2,11 @@
 import numpy as np
 import JupiterMag as jm
 
+# local files
+from synchrotron_map import RJ
+
 TWO_D_NDArray = np.ndarray[tuple[int, int], np.dtype[np.float32]]
+RJ_polar_ratio = 66854 / RJ
 
 def init_jm_config():
     jm.Con2020.Config(equation_type='analytic')
@@ -57,3 +61,25 @@ def pre_compute_mshell_traces(M: float, ntraces: int = 100) -> jm.TraceField:
     z0 = np.cos(theta)
     # see https://github.com/mattkjames7/JupiterMag/blob/a3fc24f20e0860296a11a55ee14f0e5f5e8fc577/JupiterMag/TraceField.py#L16 for args
     return jm.TraceField(x0, y0, z0, Verbose=False, IntModel='jrm33', ExtModel='Con2020', MaxStep=0.1)
+
+
+def B_field_mesh(M_max: float, N: float = 120):
+    x_vec = np.linspace(-M_max, M_max, N)
+    y_vec = np.linspace(-M_max, M_max, N)
+    z_vec = np.linspace(-M_max*2/3, M_max*2/3, N*2//3)
+    X, Y, Z = np.meshgrid(x_vec, y_vec, z_vec, indexing='ij', dtype=np.float32)
+
+    B_mesh = B(X, Y, Z)
+
+    TFeq = jm.TraceField(X, Y, Z, Verbose=False, IntModel='jrm33', ExtModel='Con2020').equator
+    B_mesh_eq = B(TFeq.x3, TFeq.y3, TFeq.z3)
+    M_shell = TFeq.mshell
+
+    jupiter_mask = X**2 + Y**2 + (Z / RJ_polar_ratio)**2 <= 1
+    B_mesh[jupiter_mask, :] = np.nan
+    B_mesh_eq[jupiter_mask, :] = np.nan
+    M_shell[jupiter_mask, :] = np.nan
+
+    np.savez("B-mesh_Mmax-{M_max}_N-{N}.npz", B_mesh=B_mesh, B_mesh_eq=B_mesh_eq, M_shell=M_shell)
+
+    return X, Y, Z, B_mesh, B_mesh_eq, M_shell
