@@ -5,6 +5,9 @@ import JupiterMag as jm
 # local files
 from synchrotron_map import RJ
 
+# default
+import argparse
+
 TWO_D_NDArray = np.ndarray[tuple[int, int], np.dtype[np.float32]]
 RJ_polar_ratio = 66854 / RJ
 
@@ -85,3 +88,14 @@ def generate_Bfield_mesh(M_max: float, N: float = 120):
     np.savez("B-mesh_Mmax-{M_max}_N-{N}.npz", B_mesh=B_mesh, B_mesh_eq=B_mesh_eq, Mshell=Mshell, dipole_lon=dipole_lon)
 
 
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--Mmax", required=True, type=float, help="Max RJ distance of mesh")
+    parser.add_argument('-N', "--N", required=False, default=120, type=int, help="Number of mesh intervals in x and y dimensions")
+    args = parser.parse_args()
+    generate_Bfield_mesh(args.Mmax, args.N)
+
+
+if __name__ == "__main__":
+    init_jm_config()
+    main()
