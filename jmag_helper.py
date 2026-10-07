@@ -72,9 +72,9 @@ def generate_Bfield_mesh(M_max: float, N: float = 120):
     z_vec = np.linspace(-M_max*2/3, M_max*2/3, N*2//3 + 1)
     X, Y, Z = np.meshgrid(x_vec, y_vec, z_vec, indexing='ij', dtype=np.float32)
 
-    B_mesh = B(X, Y, Z)
+    B_mesh = B(X, Y, Z)     # these positions are SIII!
 
-    TFeq = jm.TraceField(X, Y, Z, Verbose=False, IntModel='jrm33', ExtModel='Con2020', MaxStep=0.01).equator
+    TFeq = jm.TraceField(X, Y, Z, Verbose=False, IntModel='jrm33', ExtModel='Con2020', MaxStep=0.01).equator    # these positions are SIII!
     B_mesh_eq = B(TFeq.x3, TFeq.y3, TFeq.z3)
     Mshell = np.array(TFeq.mshell, dtype=np.float32)
     dipole_lon = np.rad2deg(np.array(TFeq.mlone, dtype=np.float32)) + 180

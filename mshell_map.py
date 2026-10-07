@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import binned_statistic_2d
 from JupiterMag import TraceField
+from scipy.interpolate import RegularGridInterpolator as RGI
 
 # local files
 from plot_data import make_subplots
@@ -195,12 +196,23 @@ def main():
     parser.add_argument("--ch", required=False, type=str, default="1,2,3,4,5,6", help="List of channels separated by comma")
     parser.add_argument("--PJs", required=True, type=str, help="Perijove range (e.g. 1,2,5,6 or 1-7 or 1,3-6)")
     parser.add_argument("--M", required=True, type=str, help="M-shell")
+    parser.add_argument('-f', "--mesh-file", required=True, type=str, help="npz file containing mesh information")
     args = parser.parse_args()
+
+    # input validation
     chs = np.array([int(ch) for ch in args.ch.split(',')])
     for ch in chs: assert ch in range(1, 7), "Valid channel numbers are 1-6"
     pjs = parse_PJs(args.PJs)
     for pj in pjs: assert pj in range(1, 78), "Valid perijoves numbers are 1-77"
     Ms = np.array([float(M) for M in args.M.split(',')])
+
+    # construct RegularGridInterpolators for each mesh value
+    mesh_data = np.load(args.mesh_file)
+    points = mesh_data["points"]
+    RGI_B =   RGI(points=points, values=mesh_data["B_mesh"],     method='linear', bounds_error=False, fill_value=np.nan)
+    RGI_Beq = RGI(points=points, values=mesh_data["B_mesh_eq"],  method='linear', bounds_error=False, fill_value=np.nan)
+    RGI_M =   RGI(points=points, values=mesh_data["Mshell"],     method='linear', bounds_error=False, fill_value=np.nan)
+    RGI_phi = RGI(points=points, values=mesh_data["dipole_lon"], method='linear', bounds_error=False, fill_value=np.nan)
 
     for M in Ms:
         time_series_data = compile_data(pjs, args.dt, chs, M, ntraces=100)
