@@ -229,6 +229,36 @@ def main():
     RGI_phi = RGI(points=points, values=mesh_data["dipole_lon"], method='linear', bounds_error=False, fill_value=np.nan)
 
     for M in Ms:
+        # create numpy array that is (#chs, #alpha, #lon, #pjs) so i can take median over pjs
+        out = np.empty((len(chs), 90, 100, len(pjs)))
+        out[:] = np.nan     # initialize as NaNs
+        skipped_PJs = []
+        for pj in pjs:
+            print(f"Loading PJ {pj}")
+            try:
+                IRDR_data_pj, GRDR_data_pj = load_PJ_data(pj, args.dt, chs, keep_cols_GRDR=COLS_GRDR)
+            except (NoProductsError, FileDownloadError, DownloadShortCircuitError, BadPJError) as err:
+                print(f"Skipping PJ: {pj}")
+                skipped_PJs.append(pj)
+                continue
+            # grab relevant columns
+            Jn_SIII = GRDR_data_pj[['S3RH_x_JcJn', 'S3RH_y_JcJn', 'S3RH_z_JcJn']].to_numpy(dtype=np.float32) / RJ   # normalized to Jupiter radius
+            boresight_SIII_1 = GRDR_data_pj[['S3RH_x_B1', 'S3RH_y_B1', 'S3RH_z_B1']].to_numpy(dtype=np.float32)     # normalized
+            boresight_SIII_2 = GRDR_data_pj[['S3RH_x_B2', 'S3RH_y_B2', 'S3RH_z_B2']].to_numpy(dtype=np.float32)     # normalized
+
+            print("Filtering")
+            pos_mask = mask_M(Jn_SIII, RGI_M, M, 0.05)
+            jupiter_mask_ch1 = mask_jupiter(GRDR_data_pj["PC_lon_JsB1"].to_numpy())
+            jupiter_mask_ch2 = mask_jupiter(GRDR_data_pj["PC_lon_JsB2"].to_numpy())
+
+            mask1 = np.logical_and(~jupiter_mask_ch1, pos_mask)
+            mask2 = np.logical_and(~jupiter_mask_ch2, pos_mask)
+            Jn_SIII_ch1 = Jn_SIII[mask1, :]                                                                     # mask positions
+            boresight_SIII_1 = boresight_SIII_1[mask1, :]                                                       # mask boresights
+
+            Jn_SIII_ch2 = Jn_SIII[mask2, :]                                                                     # mask positions
+            boresight_SIII_2 = boresight_SIII_2[mask2, :]                                                       # mask boresights
+
         time_series_data = compile_data(pjs, args.dt, chs, M, ntraces=100)
         stacked_data = stack_data(time_series_data)
         params_str = f"PJs{args.PJs}_CHs{args.ch}_M{M}_dt{args.dt}"
