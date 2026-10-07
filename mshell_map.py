@@ -165,6 +165,20 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
     print(f"Data compilation finished. Skipped PJs: {skipped_PJs}")
     return out
 
+def mask_M(Jn_SIII: TWO_D_NDArray, RGI_M: RGI, M: float) -> np.ndarray:
+    # inputs are Juno positions in SIII / RJ, an interpolator for Mshell on the mesh, and the desired M shell
+    # Jn_SIII is # num samples x 3
+    Jn_Ms = RGI_M(Jn_SIII)
+    return np.logical_and(Jn_Ms > 1.01, Jn_Ms < M * 0.98)
+
+
+def mask_jupiter(jupiter_intersections: np.ndarray) -> np.ndarray:
+    # filter out views of Jupiter --- 12 deg/s, so ~1-2 sec for whole beam width to be off Jupiter -> 10-20 extra samples
+    n_extra = 15                                                                            # 15 extra samples
+    jupiter_mask = ~np.isnan(jupiter_intersections)                                         # masks for where antenna beam is looking at Jupiter
+    jupiter_mask = np.convolve(jupiter_mask, np.ones(2*n_extra + 1).astype(bool), 'same')   # expand mask to include beamwidth
+    return jupiter_mask
+
 
 def bin_data(T_a: np.ndarray, lons: np.ndarray, alphas: np.ndarray, ntraces: int) -> np.ndarray:
     # longitudes in degrees!
