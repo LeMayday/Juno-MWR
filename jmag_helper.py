@@ -71,15 +71,17 @@ def generate_Bfield_mesh(M_max: float, N: float = 120):
 
     B_mesh = B(X, Y, Z)
 
-    TFeq = jm.TraceField(X, Y, Z, Verbose=False, IntModel='jrm33', ExtModel='Con2020').equator
+    TFeq = jm.TraceField(X, Y, Z, Verbose=False, IntModel='jrm33', ExtModel='Con2020', MaxStep=0.01).equator
     B_mesh_eq = B(TFeq.x3, TFeq.y3, TFeq.z3)
-    M_shell = TFeq.mshell
+    Mshell = TFeq.mshell
+    dipole_lon = np.rad2deg(TFeq.mlone) + 180
 
     jupiter_mask = X**2 + Y**2 + (Z / RJ_polar_ratio)**2 <= 1
     B_mesh[jupiter_mask, :] = np.nan
     B_mesh_eq[jupiter_mask, :] = np.nan
-    M_shell[jupiter_mask, :] = np.nan
+    Mshell[jupiter_mask, :] = np.nan
+    dipole_lon[jupiter_mask, :] = np.nan
 
-    np.savez("B-mesh_Mmax-{M_max}_N-{N}.npz", B_mesh=B_mesh, B_mesh_eq=B_mesh_eq, M_shell=M_shell)
+    np.savez("B-mesh_Mmax-{M_max}_N-{N}.npz", B_mesh=B_mesh, B_mesh_eq=B_mesh_eq, Mshell=Mshell, dipole_lon=dipole_lon)
 
-    return X, Y, Z, B_mesh, B_mesh_eq, M_shell
+
