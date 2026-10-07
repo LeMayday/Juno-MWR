@@ -12,7 +12,7 @@ def init_jm_config():
 def B(X, Y, Z):
     Bx_int, By_int, Bz_int = jm.Internal.Field(X, Y, Z)
     Bx_ext, By_ext, Bz_ext = jm.Con2020.Field(X, Y, Z)
-    return Bx_int + Bx_ext, By_int + By_ext, Bz_int + Bz_ext
+    return np.stack(Bx_int + Bx_ext, By_int + By_ext, Bz_int + Bz_ext, axis=-1).astype(np.float32)
 
 
 def trace_batch_mshell(r: TWO_D_NDArray):

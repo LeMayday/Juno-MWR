@@ -57,8 +57,7 @@ def intersect_w_alphaeq_lon(T: TraceField, r_sc: TWO_D_NDArray, r_b: TWO_D_NDArr
     alpha_data = np.acos(np.einsum('ij,ij->i', b_data, r_b))                # num samples
     
     Xeq, Yeq, Zeq = T.equator.x3, T.equator.y3, T.equator.z3                # ntraces
-    Bx_eq, By_eq, Bz_eq = B(Xeq, Yeq, Zeq)
-    B_eq_vec = np.stack((Bx_eq, By_eq, Bz_eq), axis=-1).astype(np.float32)  # ntraces x 3
+    B_eq_vec = B(Xeq, Yeq, Zeq)                                             # ntraces x 3
     # need to convert from collapsed indices in los_mask to ntraces
     trace_mask = los_mask // max_trace
     B_eq_data = B_eq_vec[trace_mask, :]                                     # num samples x 3
