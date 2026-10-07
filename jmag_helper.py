@@ -4,12 +4,12 @@ import JupiterMag as jm
 
 TWO_D_NDArray = np.ndarray[tuple[int, int], np.dtype[np.float32]]
 
-def init_Con2020_config():
+def init_jm_config():
     jm.Con2020.Config(equation_type='analytic')
+    jm.Internal.Config(Model="jrm33", CartesianIn=True, CartesianOut=True)
 
 
 def B(X, Y, Z):
-    jm.Internal.Config(Model="jrm33", CartesianIn=True, CartesianOut=True)
     Bx_int, By_int, Bz_int = jm.Internal.Field(X, Y, Z)
     Bx_ext, By_ext, Bz_ext = jm.Con2020.Field(X, Y, Z)
     return Bx_int + Bx_ext, By_int + By_ext, Bz_int + Bz_ext

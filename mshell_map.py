@@ -9,7 +9,7 @@ from plot_data import make_subplots
 from PDS_helper import load_PJ_data, NoProductsError, FileDownloadError, DownloadShortCircuitError, BadPJError
 from synchrotron_map import parse_PJs, stack_data, RJ
 from coordinates import lat_lonW
-from jmag_helper import B, pre_compute_mshell_traces, init_Con2020_config, trace_batch_mshell
+from jmag_helper import B, pre_compute_mshell_traces, init_jm_config, trace_batch_mshell
 
 # default
 import argparse
@@ -107,7 +107,7 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
     min_lat = -80#np.max([M_trace.ionosphere.lats, M_trace.surface.lats])
     skipped_PJs = []
 
-    with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS, initializer=init_Con2020_config) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS, initializer=init_jm_config) as executor:
         for pj in pjs:
             print(f"Loading PJ {pj}")
             try:
@@ -212,5 +212,5 @@ def main():
 
 
 if __name__ == "__main__":
-    init_Con2020_config()
+    init_jm_config()
     main()
