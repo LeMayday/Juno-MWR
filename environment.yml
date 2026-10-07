@@ -1,4 +1,4 @@
-name: juno-mwr-env
+name: juno-mwr
 channels:
   - defaults
 dependencies:
