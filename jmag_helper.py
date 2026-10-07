@@ -63,10 +63,10 @@ def pre_compute_mshell_traces(M: float, ntraces: int = 100) -> jm.TraceField:
     return jm.TraceField(x0, y0, z0, Verbose=False, IntModel='jrm33', ExtModel='Con2020', MaxStep=0.1)
 
 
-def B_field_mesh(M_max: float, N: float = 120):
-    x_vec = np.linspace(-M_max, M_max, N)
-    y_vec = np.linspace(-M_max, M_max, N)
-    z_vec = np.linspace(-M_max*2/3, M_max*2/3, N*2//3)
+def generate_Bfield_mesh(M_max: float, N: float = 120):
+    x_vec = np.linspace(-M_max, M_max, N+1)
+    y_vec = np.linspace(-M_max, M_max, N+1)
+    z_vec = np.linspace(-M_max*2/3, M_max*2/3, N*2//3 + 1)
     X, Y, Z = np.meshgrid(x_vec, y_vec, z_vec, indexing='ij', dtype=np.float32)
 
     B_mesh = B(X, Y, Z)
