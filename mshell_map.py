@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import binned_statistic_2d
 from JupiterMag import TraceField
 from scipy.interpolate import RegularGridInterpolator as RGI
+from scipy.ndimage import map_coordinates
 
 # local files
 from plot_data import make_subplots
@@ -25,6 +26,33 @@ COLS_GRDR = ['t_ephem_time', 't_utc_doy',
              'PC_lon_JsB1', 'PC_lon_JsB2',
              'S3RH_x_B1', 'S3RH_y_B1', 'S3RH_z_B1', 'S3RH_x_B2', 'S3RH_y_B2', 'S3RH_z_B2',
              'range_JnJc', 'S3RH_x_JcJn', 'S3RH_y_JcJn', 'S3RH_z_JcJn']
+
+
+class UniformGridLinearInterpolator:
+    # see https://docs.scipy.org/doc/scipy-1.14.1/tutorial/interpolate/ND_regular_grid.html
+    def __init__(self, points, values):
+        self.limits = np.array([[min(x), max(x)] for x in points])
+        self.values = np.asarray(values, dtype=float)
+
+    def __call__(self, xi):
+        """
+        `xi` here is an array-like (an array or a list) of points.
+
+        Each "point" is an ndim-dimensional array_like, representing
+        the coordinates of a point in ndim-dimensional space.
+        """
+        # transpose the xi array into the ``map_coordinates`` convention
+        # which takes coordinates of a point along columns of a 2D array.
+        xi = np.moveaxis(np.asarray(xi), -1, 0)
+
+        # convert from data coordinates to pixel coordinates
+        ns = self.values.shape
+        coords = [(n-1)*(val - lo) / (hi - lo) for val, n, (lo, hi) in zip(xi, ns, self.limits)]
+
+        # interpolate
+        return map_coordinates(self.values, coords, order=1, mode='constant', cval=np.nan)  # fill_value
+
+UGLI = UniformGridLinearInterpolator  # type alias
 
 
 def batch_data(data: np.ndarray) -> list[np.ndarray]:
