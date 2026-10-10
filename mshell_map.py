@@ -32,7 +32,7 @@ class UniformGridLinearInterpolator:
     # see https://docs.scipy.org/doc/scipy-1.14.1/tutorial/interpolate/ND_regular_grid.html
     def __init__(self, points, values):
         self.limits = np.array([[min(x), max(x)] for x in points])
-        self.values = np.asarray(values, dtype=float)
+        self.values = np.asarray(values, dtype=float)   # note this could be (..., 3) for a vector-valued function
 
     def __call__(self, xi):
         """
@@ -45,12 +45,19 @@ class UniformGridLinearInterpolator:
         # which takes coordinates of a point along columns of a 2D array.
         xi = np.moveaxis(np.asarray(xi), -1, 0)
 
-        # convert from data coordinates to pixel coordinates
-        ns = self.values.shape
-        coords = [(n-1)*(val - lo) / (hi - lo) for val, n, (lo, hi) in zip(xi, ns, self.limits)]
-
-        # interpolate
-        return map_coordinates(self.values, coords, order=1, mode='constant', cval=np.nan)  # fill_value
+        if len(self.values.shape) == len(self.limits):  # if scalar function, add dummy axis
+            self.values = np.expand_dims(self.values, -1)
+        ns = self.values.shape[:-1]                     # dimensions of function domain
+        n_values = self.values.shape[-1]                # dimensions of function value (1 if scalar, >1 if vector)
+        out = np.zeros((*coords.shape[1:], n_values))   # output will be coords.shape[1:] for each value of the function
+        for i in range(n_values):                       # loop through function scalar/vector components (for each dim...)
+            # convert from data coordinates to pixel coordinates
+            coords = [(n-1)*(val - lo) / (hi - lo) for val, n, (lo, hi) in zip(xi, ns, self.limits)]
+            # interpolate
+            out[:, i] = map_coordinates(self.values, coords, order=1, mode='constant', cval=np.nan)
+        if out.shape[-1] == 1:   # scalar function
+            return out[:, 0]
+        return out
 
 UGLI = UniformGridLinearInterpolator  # type alias
 
