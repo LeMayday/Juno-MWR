@@ -246,9 +246,9 @@ def mask_jupiter(jupiter_intersections: np.ndarray) -> np.ndarray:
     return jupiter_mask
 
 
-def bin_data(T_a: np.ndarray, lons: np.ndarray, alphas: np.ndarray, ntraces: int) -> np.ndarray:
+def bin_data(T_a: np.ndarray, lons: np.ndarray, alphas: np.ndarray) -> np.ndarray:
     # longitudes in degrees!
-    lon_bins = np.linspace(0, 360, ntraces+1, endpoint=True)
+    lon_bins = np.linspace(0, 360, 181, endpoint=True)
     alpha_bins = np.linspace(0, 90, 91, endpoint=True)
     med, _, _, _ = binned_statistic_2d(x=lons, y=alphas, values=T_a, statistic="median", bins=[lon_bins, alpha_bins])
     return med
@@ -296,7 +296,7 @@ def main():
 
     for M in Ms:
         # create numpy array that is (#chs, #alpha, #lon, #pjs) so i can take median over pjs
-        out = np.empty((len(chs), 90, 100, len(pjs)))
+        out = np.empty((len(chs), 90, 180, len(pjs)))
         out[:] = np.nan     # initialize as NaNs
         skipped_PJs = []
         for pj in pjs:
