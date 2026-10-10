@@ -231,10 +231,10 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, M: float, ntraces: in
     print(f"Data compilation finished. Skipped PJs: {skipped_PJs}")
     return out
 
-def mask_M(Jn_SIII: TWO_D_NDArray, RGI_M: RGI, M: float) -> np.ndarray:
+def mask_M(Jn_SIII: TWO_D_NDArray, UGLI_M: UGLI, M: float) -> np.ndarray:
     # inputs are Juno positions in SIII / RJ, an interpolator for Mshell on the mesh, and the desired M shell
     # Jn_SIII is # num samples x 3
-    Jn_Ms = RGI_M(Jn_SIII)
+    Jn_Ms = UGLI_M(Jn_SIII)
     return np.logical_and(Jn_Ms > 1.01, Jn_Ms < M * 0.98)
 
 
@@ -289,10 +289,10 @@ def main():
     # construct RegularGridInterpolators for each mesh value
     mesh_data = np.load(args.mesh_file)
     points = mesh_data["points"]
-    RGI_B =   RGI(points=points, values=mesh_data["B_mesh"],     method='linear', bounds_error=False, fill_value=np.nan)
-    RGI_Beq = RGI(points=points, values=mesh_data["B_mesh_eq"],  method='linear', bounds_error=False, fill_value=np.nan)
-    RGI_M =   RGI(points=points, values=mesh_data["Mshell"],     method='linear', bounds_error=False, fill_value=np.nan)
-    RGI_phi = RGI(points=points, values=mesh_data["dipole_lon"], method='linear', bounds_error=False, fill_value=np.nan)
+    UGLI_B =   UGLI(points=points, values=mesh_data["B_mesh"])
+    UGLI_Beq = UGLI(points=points, values=mesh_data["B_mesh_eq"])
+    UGLI_M =   UGLI(points=points, values=mesh_data["Mshell"])
+    UGLI_lon = UGLI(points=points, values=mesh_data["dipole_lon"])
 
     for M in Ms:
         # create numpy array that is (#chs, #alpha, #lon, #pjs) so i can take median over pjs
@@ -313,7 +313,7 @@ def main():
             boresight_SIII_2 = GRDR_data_pj[['S3RH_x_B2', 'S3RH_y_B2', 'S3RH_z_B2']].to_numpy(dtype=np.float32)     # normalized
 
             print("Filtering")
-            pos_mask = mask_M(Jn_SIII, RGI_M, M, 0.05)
+            pos_mask = mask_M(Jn_SIII, UGLI_M, M, 0.05)
             jupiter_mask_ch1 = mask_jupiter(GRDR_data_pj["PC_lon_JsB1"].to_numpy())
             jupiter_mask_ch2 = mask_jupiter(GRDR_data_pj["PC_lon_JsB2"].to_numpy())
 
