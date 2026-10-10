@@ -12,10 +12,7 @@ from synchrotron_map import parse_PJs, stack_data, RJ
 # default
 import argparse
 import pickle
-import concurrent.futures
-import os
 
-MAX_WORKERS = max(1, os.cpu_count() - 2)
 TWO_D_NDArray = np.ndarray[tuple[int, int], np.dtype[np.float32]]
 THREE_D_NDArray = np.ndarray[tuple[int, int, int], np.dtype[np.float32]]
 COLS_GRDR = ['t_ephem_time', 't_utc_doy',
@@ -56,12 +53,6 @@ class UniformGridLinearInterpolator:
         return out
 
 UGLI = UniformGridLinearInterpolator  # type alias
-
-
-def batch_data(data: np.ndarray) -> list[np.ndarray]:
-    size = data.shape[0]
-    batch_size = max(500, int(np.ceil(size / MAX_WORKERS)))                 # ceiling division to prevent missing remainder, with 500 as smallest size
-    return [data[i:i + batch_size] for i in range(0, size, batch_size)]
 
 
 def intersect_alphas_lons(r_sc: TWO_D_NDArray, r_b: TWO_D_NDArray, s: np.ndarray,
