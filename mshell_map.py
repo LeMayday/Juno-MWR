@@ -68,6 +68,37 @@ def batch_data(data: np.ndarray) -> list[np.ndarray]:
     return [data[i:i + batch_size] for i in range(0, size, batch_size)]
 
 
+def intersect_alphas_lons(r_sc: TWO_D_NDArray, r_b: TWO_D_NDArray, s: np.ndarray,
+                          UGLI_M: UGLI, UGLI_B: UGLI, UGLI_Beq: UGLI, UGLI_lon: UGLI,
+                          M: float, dM: float):
+    # r_sc is vector of normalized S/C pos vectors in SIII
+    # r_b is vector of normalized boresight vectors in SIII
+    # s_los is distance along line of sight
+    s_los = r_b[:, None, :] * s[None, :, None]          # num samples x num LOS pts x 3
+    r_los = r_sc[:, None, :] + s_los                    # add spacecraft positions to LOS points
+    M_los = UGLI_M(r_los)                               # num samples x num LOS pts
+    mask_M = np.logical_and(M_los > M - dM, M_los < M + dM)     # where the LOS is looking at the desired M-shell
+    r_los_M = r_los[mask_M, :]                          # valid mask positions x 3
+    B_los = UGLI_B(r_los)                               # num samples x num LOS pts x 3
+    b_los = B_los / np.linalg.norm(B_los, axis=-1, keepdims=True)
+    alpha_los = np.acos(np.einsum('ijk,ik->ij', b_los, r_b))    # num samples x num LOS pts
+    Beq_los = UGLI_Beq(r_los)
+    # sin^2(alpha) / B = sin^2(alpha_eq) / Beq => sin(alpha_eq) = sin(alpha) * sqrt(Beq / B)
+    alpha_eq_los = np.asin(np.sin(alpha_los) * np.sqrt(np.linalg.norm(Beq_los, axis=-1) / np.linalg.norm(B_los, axis=-1)))
+    lon_los = UGLI_lon(r_los)
+
+    # filter regions outside Mshell
+    alpha_los[~mask_M] = np.nan
+    alpha_eq_los[~mask_M] = np.nan
+    lon_los[~mask_M] = np.nan
+    # average over valid M-shell region in row (sample)
+    alpha_data = np.nanmean(alpha_los, axis=-1)
+    alpha_eq_data = np.nanmean(alpha_eq_los, axis=-1)
+    lon_data = np.nanmean(lon_los, axis=-1)
+    Mshell_intersect_pts = r_los[mask_M, :]             # physical points where Mshell was intersected (for plotting)
+    return alpha_data, alpha_eq_data, lon_data, Mshell_intersect_pts
+
+
 def intersect_w_alphaeq_lon(T: TraceField, r_sc: TWO_D_NDArray, r_b: TWO_D_NDArray, M: float, pj: int):
     # return positions, B fields, and pitch angles at intersections
     # r_sc is vector of normalized S/C pos vectors in SIII
