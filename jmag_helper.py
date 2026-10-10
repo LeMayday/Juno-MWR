@@ -16,17 +16,17 @@ def init_jm_config():
     jm.Internal.Config(Model="jrm33", CartesianIn=True, CartesianOut=True)
 
 
-def B(X, Y, Z):
+def B(X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> np.ndarray:
     Bx_int, By_int, Bz_int = jm.Internal.Field(X, Y, Z)
     Bx_ext, By_ext, Bz_ext = jm.Con2020.Field(X, Y, Z)
-    return np.stack(Bx_int + Bx_ext, By_int + By_ext, Bz_int + Bz_ext, axis=-1).astype(np.float32)
+    return np.stack((Bx_int + Bx_ext, By_int + By_ext, Bz_int + Bz_ext), axis=-1).astype(np.float32)
 
 
 def generate_Bfield_mesh(M_max: float, N: float = 120):
     x_vec = np.linspace(-M_max, M_max, N+1)
     y_vec = np.linspace(-M_max, M_max, N+1)
     z_vec = np.linspace(-M_max*2/3, M_max*2/3, N*2//3 + 1)
-    X, Y, Z = np.meshgrid(x_vec, y_vec, z_vec, indexing='ij', dtype=np.float32)
+    X, Y, Z = np.meshgrid(x_vec, y_vec, z_vec, indexing='ij')
 
     B_mesh = B(X, Y, Z)     # these positions are SIII!
 
@@ -42,7 +42,7 @@ def generate_Bfield_mesh(M_max: float, N: float = 120):
     Mshell[jupiter_mask, :] = np.nan
     dipole_lon[jupiter_mask, :] = np.nan
 
-    np.savez("B-mesh_Mmax-{M_max}_N-{N}.npz", points=points, B_mesh=B_mesh, B_mesh_eq=B_mesh_eq, Mshell=Mshell, dipole_lon=dipole_lon)
+    np.savez("B-mesh_Mmax-{M_max}_N-{N}.npz", points=points, B_mesh=B_mesh, B_mesh_eq=B_mesh_eq, Mshell=Mshell, dipole_lon=dipole_lon)  # all are float32
 
 
 def main():
