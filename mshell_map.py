@@ -296,8 +296,8 @@ def main():
 
     for M in Ms:
         # create numpy array that is (#chs, #alpha, #lon, #pjs) so i can take median over pjs
-        out = np.empty((len(chs), 90, 180, len(pjs)))
-        out[:] = np.nan     # initialize as NaNs
+        series_Ta = np.full((len(chs), 90, 180, len(pjs)), np.nan)      # longitudes as cols for plotting; initialize as NaNs
+        series_alpha = np.full_like(series_Ta, np.nan)
         skipped_PJs = []
         for pj in pjs:
             print(f"Loading PJ {pj}")
@@ -316,20 +316,51 @@ def main():
             pos_mask = mask_M(Jn_SIII, UGLI_M, M, 0.05)
             jupiter_mask_ch1 = mask_jupiter(GRDR_data_pj["PC_lon_JsB1"].to_numpy())
             jupiter_mask_ch2 = mask_jupiter(GRDR_data_pj["PC_lon_JsB2"].to_numpy())
-
             mask1 = np.logical_and(~jupiter_mask_ch1, pos_mask)
             mask2 = np.logical_and(~jupiter_mask_ch2, pos_mask)
-            Jn_SIII_ch1 = Jn_SIII[mask1, :]                                                                     # mask positions
-            boresight_SIII_1 = boresight_SIII_1[mask1, :]                                                       # mask boresights
+            Jn_SIII_ch1 = Jn_SIII[mask1, :]                         # mask positions
+            boresight_SIII_1 = boresight_SIII_1[mask1, :]           # mask boresights
+            Jn_SIII_ch2 = Jn_SIII[mask2, :]                         # mask positions
+            boresight_SIII_2 = boresight_SIII_2[mask2, :]           # mask boresights
 
-            Jn_SIII_ch2 = Jn_SIII[mask2, :]                                                                     # mask positions
-            boresight_SIII_2 = boresight_SIII_2[mask2, :]                                                       # mask boresights
+            print("Calculating intersections")
+            s = np.linspace(0, 7, 100)                              # LOS distance
+            if 1 in chs:
+                alphas1, alphas_eq1, lons1, pos1 = intersect_alphas_lons(r_sc=Jn_SIII_ch1, r_b=boresight_SIII_1, s=s,
+                                                                         UGLI_M=UGLI_M, UGLI_B=UGLI_B, UGLI_Beq=UGLI_Beq, UGLI_lon=UGLI_lon,
+                                                                         M=M, dM=0.05)
+            if (len(chs) == 1 and chs[0] != 1) or len(chs) > 1:
+                alphas2, alphas_eq2, lons2, pos2 = intersect_alphas_lons(r_sc=Jn_SIII_ch2, r_b=boresight_SIII_2, s=s,
+                                                                         UGLI_M=UGLI_M, UGLI_B=UGLI_B, UGLI_Beq=UGLI_Beq, UGLI_lon=UGLI_lon,
+                                                                         M=M, dM=0.05)
+            print("Binning")
+            for ch in chs:
+                Ta = IRDR_data_pj[f"Ch{ch}"]    # antenna temperature
+                if ch == 1:
+                    alphas, alphas_eq, lons, pos = alphas1, alphas_eq1, lons1, pos1
+                    Ta = Ta[mask1]
+                else:   # I do filtering outside of this loop so I don't redo work for each ch > 1
+                    alphas, alphas_eq, lons, pos = alphas2, alphas_eq2, lons2, pos2
+                    Ta = Ta[mask2]
+                assert Ta.shape == alphas_eq.shape == lons.shape, "Ta, alphas, and lons must have same shape!"
 
-        time_series_data = compile_data(pjs, args.dt, chs, M, ntraces=100)
-        stacked_data = stack_data(time_series_data)
+                binned_Ta_medians = bin_data(Ta, lons, alphas_eq)   # this should drop values if lons or alphas_eq are nan
+                series_Ta[ch-1, :, :, pj-1] = binned_Ta_medians.T   # binned_statistic maps x to rows
+                binned_alpha_medians = bin_data(alphas, lons, alphas_eq)    # track which measurement comes from which local pitch angle
+                series_alpha[ch-1, :, :, pj-1] = binned_alpha_medians.T
+        print(f"Data compilation finished. Skipped PJs: {skipped_PJs}")
+
         params_str = f"PJs{args.PJs}_CHs{args.ch}_M{M}_dt{args.dt}"
-        np.save(f"MWR_alpha_longitude_distribution_{params_str}.npy", stacked_data)
-        plot_data(stacked_data, chs, params_str)
+        np.save(f"MWR_Ta_series_{params_str}.npy", series_Ta)
+        np.save(f"MWR_alpha_series_{params_str}.npy", series_alpha)
+
+        stacked_Ta_data = stack_data(series_Ta)
+        stacked_alpha_data = stack_data(series_alpha)
+
+        np.save(f"MWR_Ta_stacked_{params_str}.npy", stacked_Ta_data)
+        np.save(f"MWR_alpha_stacked_{params_str}.npy", stacked_alpha_data)
+        plot_data(stacked_Ta_data, chs, params_str)
+        plot_data(stacked_alpha_data, chs, params_str)
 
 
 if __name__ == "__main__":
