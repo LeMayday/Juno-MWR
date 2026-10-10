@@ -96,7 +96,7 @@ def intersect_alphas_lons(r_sc: TWO_D_NDArray, r_b: TWO_D_NDArray, s: np.ndarray
     alpha_eq_data = np.nanmean(alpha_eq_los, axis=-1)
     lon_data = np.nanmean(lon_los, axis=-1)
     Mshell_intersect_pts = r_los[mask_M, :]             # physical points where Mshell was intersected (for plotting)
-    return alpha_data, alpha_eq_data, lon_data, Mshell_intersect_pts
+    return np.rad2deg(alpha_data), np.rad2deg(alpha_eq_data), lon_data, Mshell_intersect_pts    # return everything in degrees
 
 
 def intersect_w_alphaeq_lon(T: TraceField, r_sc: TWO_D_NDArray, r_b: TWO_D_NDArray, M: float, pj: int):
