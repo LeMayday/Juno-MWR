@@ -69,17 +69,19 @@ def generate_Bfield_mesh(M_max: float, N: float = 120):
 
     B_mesh = B(X, Y, Z)     # these positions are SIII!
 
-    TFeq = jm.TraceField(X, Y, Z, Verbose=False, IntModel='jrm33', ExtModel='Con2020', MaxStep=0.01).equator    # these positions are SIII!
-    B_mesh_eq = B(TFeq.x3, TFeq.y3, TFeq.z3)
-    Mshell = np.array(TFeq.mshell, dtype=np.float32)
-    dipole_lon = np.rad2deg(np.array(TFeq.mlone, dtype=np.float32)) + 180   # longitudes in degrees!
+    num_bytes = (N+1) * (N+1) * (N*2//3 + 1) * 1000 * 8     # total size of X,Y,Z x 1000 pts per trace x 8 bytes per float64
+    n_splits = int(np.ceil((num_bytes / 2E9)**(1/3)))       # aim for 2 GB: num_bytes / n_splits**3 ~= 2 GB
+    eq_data = tracefield_chunked(X, Y, Z, n_splits)         # these positions are SIII! --- eq_data is domain x (x3, y3, z3, M, lon) along last axis, lon in radians
+    B_mesh_eq = B(eq_data[..., 0], eq_data[..., 1], eq_data[..., 2])
+    Mshell = eq_data[..., -2]
+    dipole_lon = eq_data[..., -1]
     points = np.stack(x_vec, y_vec, z_vec, axis=0)
 
     jupiter_mask = X**2 + Y**2 + (Z / RJ_polar_ratio)**2 <= 1
     B_mesh[jupiter_mask, :] = np.nan
     B_mesh_eq[jupiter_mask, :] = np.nan
-    Mshell[jupiter_mask, :] = np.nan
     dipole_lon[jupiter_mask, :] = np.nan
+    Mshell[jupiter_mask] = np.nan
 
     np.savez("B-mesh_Mmax-{M_max}_N-{N}.npz", points=points, B_mesh=B_mesh, B_mesh_eq=B_mesh_eq, Mshell=Mshell, dipole_lon=dipole_lon)  # all are float32
 
