@@ -75,15 +75,16 @@ def generate_Bfield_mesh(M_max: float, N: float = 120):
     B_mesh_eq = B(eq_data[..., 0], eq_data[..., 1], eq_data[..., 2])
     Mshell = eq_data[..., -2]
     dipole_lon = eq_data[..., -1]
+    dipole_xy = np.stack((np.cos(dipole_lon), np.sin(dipole_lon)), axis=-1)     # dipole_lon is dicontinuous and not interpolatable
     points = np.stack(x_vec, y_vec, z_vec, axis=0)
 
     jupiter_mask = X**2 + Y**2 + (Z / RJ_polar_ratio)**2 <= 1
     B_mesh[jupiter_mask, :] = np.nan
     B_mesh_eq[jupiter_mask, :] = np.nan
-    dipole_lon[jupiter_mask, :] = np.nan
     Mshell[jupiter_mask] = np.nan
+    dipole_xy[jupiter_mask, :] = np.nan
 
-    np.savez("B-mesh_Mmax-{M_max}_N-{N}.npz", points=points, B_mesh=B_mesh, B_mesh_eq=B_mesh_eq, Mshell=Mshell, dipole_lon=dipole_lon)  # all are float32
+    np.savez("B-mesh_Mmax-{M_max}_N-{N}.npz", points=points, B_mesh=B_mesh, B_mesh_eq=B_mesh_eq, Mshell=Mshell, dipole_xy=dipole_xy)  # all are float32
 
 
 def main():
