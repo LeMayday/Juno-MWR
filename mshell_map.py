@@ -8,6 +8,7 @@ from scipy.ndimage import map_coordinates
 from plot_data import make_subplots
 from PDS_helper import load_PJ_data, NoProductsError, FileDownloadError, DownloadShortCircuitError, BadPJError
 from synchrotron_map import parse_PJs, stack_data, RJ
+from coordinates import pos_to_angle
 
 # default
 import argparse
@@ -58,7 +59,7 @@ UGLI = UniformGridLinearInterpolator  # type alias
 
 
 def intersect_alphas_lons(r_sc: TWO_D_NDArray, r_b: TWO_D_NDArray, s: ONE_D_NDArray,
-                          UGLI_M: UGLI, UGLI_B: UGLI, UGLI_Beq: UGLI, UGLI_lon: UGLI,
+                          UGLI_M: UGLI, UGLI_B: UGLI, UGLI_Beq: UGLI, UGLI_lonxy: UGLI,
                           M: float, dM: float) -> tuple[ONE_D_NDArray, ONE_D_NDArray, ONE_D_NDArray, TWO_D_NDArray]:
     # r_sc is vector of normalized S/C pos vectors in SIII
     # r_b is vector of normalized boresight vectors in SIII
@@ -73,7 +74,10 @@ def intersect_alphas_lons(r_sc: TWO_D_NDArray, r_b: TWO_D_NDArray, s: ONE_D_NDAr
     Beq_los = UGLI_Beq(r_los)
     # sin^2(alpha) / B = sin^2(alpha_eq) / Beq => sin(alpha_eq) = sin(alpha) * sqrt(Beq / B)
     alpha_eq_los = np.asin(np.sin(alpha_los) * np.sqrt(np.linalg.norm(Beq_los, axis=-1) / np.linalg.norm(B_los, axis=-1)))
-    lon_los = UGLI_lon(r_los)
+
+    lonxy_los = UGLI_lonxy(r_los)                                                           # interpolate xy since these are continuous
+    _, lon_los_rad = pos_to_angle(lonxy_los[..., 0], lonxy_los[..., 1], 0)
+    lon_los = np.rad2deg(np.mod(lon_los_rad, 2*np.pi))   # convert xy to longitude
 
     # filter regions outside Mshell
     alpha_los[~mask_M] = np.nan
@@ -179,7 +183,7 @@ def main():
     UGLI_B =   UGLI(points=points, values=mesh_data["B_mesh"])
     UGLI_Beq = UGLI(points=points, values=mesh_data["B_mesh_eq"])
     UGLI_M =   UGLI(points=points, values=mesh_data["Mshell"])
-    UGLI_lon = UGLI(points=points, values=mesh_data["dipole_lon"])
+    UGLI_lonxy = UGLI(points=points, values=mesh_data["dipole_xy"])
 
     for M in Ms:
         # create numpy array that is (#chs, #alpha, #lon, #pjs) so i can take median over pjs
@@ -214,11 +218,11 @@ def main():
             s = np.linspace(0, 7, 100)                              # LOS distance
             if 1 in chs:
                 alphas1, alphas_eq1, lons1, pos1 = intersect_alphas_lons(r_sc=Jn_SIII_ch1, r_b=boresight_SIII_1, s=s,
-                                                                         UGLI_M=UGLI_M, UGLI_B=UGLI_B, UGLI_Beq=UGLI_Beq, UGLI_lon=UGLI_lon,
+                                                                         UGLI_M=UGLI_M, UGLI_B=UGLI_B, UGLI_Beq=UGLI_Beq, UGLI_lonxy=UGLI_lonxy,
                                                                          M=M, dM=0.05)
             if (len(chs) == 1 and chs[0] != 1) or len(chs) > 1:
                 alphas2, alphas_eq2, lons2, pos2 = intersect_alphas_lons(r_sc=Jn_SIII_ch2, r_b=boresight_SIII_2, s=s,
-                                                                         UGLI_M=UGLI_M, UGLI_B=UGLI_B, UGLI_Beq=UGLI_Beq, UGLI_lon=UGLI_lon,
+                                                                         UGLI_M=UGLI_M, UGLI_B=UGLI_B, UGLI_Beq=UGLI_Beq, UGLI_lonxy=UGLI_lonxy,
                                                                          M=M, dM=0.05)
             print("Binning")
             for ch in chs:
