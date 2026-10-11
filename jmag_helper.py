@@ -92,6 +92,7 @@ def generate_Bfield_mesh(M_max: float, N: float = 120):
 
     num_bytes = (N+1) * (N+1) * (N*2//3 + 1) * 1000 * 8     # total size of X,Y,Z x 1000 pts per trace x 8 bytes per float64
     n_splits = int(np.ceil((num_bytes / 2E9)**(1/3)))       # aim for 2 GB: num_bytes / n_splits**3 ~= 2 GB
+    n_splits *= 2                                           # be more conservative since extra memory could be used by TraceField object
     eq_data = tracefield_chunked(X, Y, Z, n_splits)         # these positions are SIII! --- eq_data is domain x (x3, y3, z3, M, lon) along last axis, lon in radians
     B_mesh_eq = B(eq_data[..., 0], eq_data[..., 1], eq_data[..., 2])
     Mshell = eq_data[..., -2]
