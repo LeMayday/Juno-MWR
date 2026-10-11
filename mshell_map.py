@@ -147,9 +147,9 @@ def plot_data(data: THREE_D_NDArray, chs: list, params_str: str, vmax: list = No
     axes = make_subplots(fig, data.shape[0])
     for i, ax in enumerate(axes):
         if vmax is not None:
-            im = ax.imshow(data[i, :].T, origin='lower', cmap='gist_ncar', vmin=0, vmax=vmax[i], aspect='auto', extent=[0, 360, 0, 90])
+            im = ax.imshow(data[i, :], origin='lower', cmap='gist_ncar', vmin=0, vmax=vmax[i], aspect='auto', extent=[0, 360, 0, 90])
         else:
-            im = ax.imshow(data[i, :].T, origin='lower', cmap='gist_ncar', aspect='auto', extent=[0, 360, 0, 90])
+            im = ax.imshow(data[i, :], origin='lower', cmap='gist_ncar', aspect='auto', extent=[0, 360, 0, 90])
         fig.colorbar(im, ax=ax)
         ax.set_title(f"Ch{chs[i]}")
         ax.set_xlabel("JRM33 Dipole Longitude")
