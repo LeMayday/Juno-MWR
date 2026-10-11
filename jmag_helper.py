@@ -44,30 +44,42 @@ def batch_equator(R: np.ndarray) -> np.ndarray:
     out_flat[:, 4] = np.mod(Teq.mlone, 2*np.pi)     # mlone returns lon in radians from [-pi, pi]. (lon + 2pi) % 2pi
     return out_flat.reshape((*R.shape[:-1], 5))     # reshape back to original R shape
 
-def tracefield_chunked(X, Y, Z, n_splits=3):
-    """
-    Splits 3D coordinate grids (X, Y, Z) into n_splits along each axis (default 3x3x3=27),
-    evaluates TraceField on each chunk, and concatenates the resulting .equator fields.
-    """
-    XYZ = np.stack([X, Y, Z], axis=-1)
 
+def chunk_and_flatten_3D(X, Y, Z, n_splits):
+    XYZ = np.stack([X, Y, Z], axis=-1)
     flat_chunks = [
         chunk
         for x_chunk in np.array_split(XYZ, n_splits, axis=0)       # Spatial X
         for y_chunk in np.array_split(x_chunk, n_splits, axis=1)   # Spatial Y
         for chunk in np.array_split(y_chunk, n_splits, axis=2)     # Spatial Z
     ]
+    return flat_chunks
+
+
+def recombine_chunked_data(flat_results, n_splits):
+    list_of_xs = []
+    for i in range(n_splits):
+        idx_x = i * n_splits**2
+        list_of_ys = []
+        for j in range(n_splits):
+            idx_j = j * n_splits
+            idx_start = idx_x + idx_j
+            list_of_ys.append(np.concatenate(flat_results[idx_start : idx_start + n_splits], axis=2))    # combine across z
+        list_of_xs.append(np.concatenate(list_of_ys, axis=1))
+    return np.concatenate(list_of_xs, axis=0)
+
+
+def tracefield_chunked(X, Y, Z, n_splits=3):
+    """
+    Splits 3D coordinate grids (X, Y, Z) into n_splits along each axis (default 3x3x3=27),
+    evaluates TraceField on each chunk, and concatenates the resulting .equator fields.
+    """
+    flat_chunks = chunk_and_flatten_3D(X, Y, Z, n_splits)
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS, initializer=init_jm_config) as executor:
         flat_results = list(executor.map(batch_equator, flat_chunks))
 
-    # Create an explicit object array to hold chunks of varying shapes
-    obj_grid = np.empty(len(flat_results), dtype=object)
-    obj_grid[:] = flat_results
-    obj_grid_3d = obj_grid.reshape(n_splits, n_splits, n_splits)
-
-    # np.block handles varying spatial chunk shapes seamlessly
-    return np.block(obj_grid_3d)
+    return recombine_chunked_data(flat_results, n_splits)
 
 
 def generate_Bfield_mesh(M_max: float, N: float = 120):
@@ -96,7 +108,21 @@ def generate_Bfield_mesh(M_max: float, N: float = 120):
     np.savez("B-mesh_Mmax-{M_max}_N-{N}.npz", points=points, B_mesh=B_mesh, B_mesh_eq=B_mesh_eq, Mshell=Mshell, dipole_xy=dipole_xy)  # all are float32
 
 
+def test_chunking_and_recombining():
+    N = 12
+    x_vec = np.linspace(-12, 12, N+1)
+    y_vec = np.linspace(-10, 10, N+1)
+    z_vec = np.linspace(-12*2/3, 12*2/3, N*2//3 + 1)
+    X, Y, Z = np.meshgrid(x_vec, y_vec, z_vec, indexing='ij')
+    n_splits = 2
+    XYZ_test = recombine_chunked_data(chunk_and_flatten_3D(X, Y, Z, n_splits), n_splits)
+    XYZ = np.stack((X, Y, Z), axis=-1)
+    assert np.count_nonzero(XYZ != XYZ_test) == 0
+    print("chunking_and_recombining test passed!")
+
+
 def main():
+    test_chunking_and_recombining()
     parser = argparse.ArgumentParser()
     parser.add_argument("--Mmax", required=True, type=float, help="Max RJ distance of mesh")
     parser.add_argument('-N', "--N", required=False, default=120, type=int, help="Number of mesh intervals in x and y dimensions")
