@@ -155,7 +155,7 @@ def plot_data(data: THREE_D_NDArray, chs: list, params_str: str, vmax: list = No
         ax.set_xlabel("JRM33 Dipole Longitude")
         ax.set_ylabel("$\\alpha_{eq}$")
     fig.tight_layout()
-    fig.savefig(f"MWR_alpha_longitude_distribution_{params_str}.png", dpi=300)
+    fig.savefig(f"MWR_{params_str}.png", dpi=300)
 
 
 def main():
@@ -250,8 +250,8 @@ def main():
 
         np.save(f"MWR_Ta_stacked_{params_str}.npy", stacked_Ta_data)
         np.save(f"MWR_alpha_stacked_{params_str}.npy", stacked_alpha_data)
-        plot_data(stacked_Ta_data, chs, params_str)
-        plot_data(stacked_alpha_data, chs, params_str)
+        plot_data(stacked_Ta_data, chs, f"Ta_series_{params_str}")
+        plot_data(stacked_alpha_data, chs, f"alpha_series_{params_str}")
 
 
 if __name__ == "__main__":
