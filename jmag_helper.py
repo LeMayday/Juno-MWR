@@ -95,7 +95,7 @@ def tracefield_chunked(X: THREE_D_NDArray, Y: THREE_D_NDArray, Z: THREE_D_NDArra
     # for i, chunk in enumerate(flat_chunks):
     #     flat_results.append(batch_equator(chunk))
 
-    with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS, initializer=init_jm_config) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=12, initializer=init_jm_config) as executor:
         flat_results = list(executor.map(batch_equator, flat_chunks))
 
     return recombine_chunked_data(flat_results, n_splits)
