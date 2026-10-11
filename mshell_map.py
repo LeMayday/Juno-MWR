@@ -204,7 +204,7 @@ def main():
             boresight_SIII_2 = GRDR_data_pj[['S3RH_x_B2', 'S3RH_y_B2', 'S3RH_z_B2']].to_numpy(dtype=np.float32)     # normalized
 
             print("Filtering")
-            pos_mask = mask_M(Jn_SIII, UGLI_M, M, 0.05)
+            pos_mask = mask_M(Jn_SIII, UGLI_M, M)
             jupiter_mask_ch1 = mask_jupiter(GRDR_data_pj["PC_lon_JsB1"].to_numpy())
             jupiter_mask_ch2 = mask_jupiter(GRDR_data_pj["PC_lon_JsB2"].to_numpy())
             mask1 = np.logical_and(~jupiter_mask_ch1, pos_mask)
