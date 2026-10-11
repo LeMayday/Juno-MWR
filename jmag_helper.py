@@ -122,8 +122,32 @@ def test_chunking_and_recombining():
     print("chunking_and_recombining test passed!")
 
 
+def test_Bfield_trace_chunking():
+    # Note: chunking JMag produces a different output than not chunking. Google AI claims this is due to
+    # JMag picking numerical integration steps based on what values are present in the given vector of positions.
+    # I haven't been able to verify this, but some of the discrepancies probably won't matter? (e.g. at a point,
+    # one method finds Mshell 160, one finds 0. This is too high to matter anyway)
+    N = 12
+    x_vec = np.linspace(-12, 12, N+1)
+    y_vec = np.linspace(-10, 10, N+1)
+    z_vec = np.linspace(-12*2/3, 12*2/3, N*2//3 + 1)
+    X, Y, Z = np.meshgrid(x_vec, y_vec, z_vec, indexing='ij')
+    n_splits = 2
+    eq_data = tracefield_chunked(X, Y, Z, n_splits)
+    Mshell_chunked = eq_data[..., -2]
+    Mshell_chunked[Mshell_chunked < 0.5] = np.nan
+    Mshell_chunked = np.nan_to_num(Mshell_chunked)
+    R = np.stack((X, Y, Z), axis=-1)
+    Mshell_not_chunked = batch_equator(R)[..., -2]
+    Mshell_not_chunked[Mshell_not_chunked < 0.5] = np.nan
+    Mshell_not_chunked = np.nan_to_num(Mshell_not_chunked)
+    assert np.count_nonzero(~np.isclose(Mshell_chunked, Mshell_not_chunked)) == 0
+    print("Test passed!")
+
+
 def main():
     test_chunking_and_recombining()
+    # test_Bfield_trace_chunking()
     parser = argparse.ArgumentParser()
     parser.add_argument("--Mmax", required=True, type=float, help="Max RJ distance of mesh")
     parser.add_argument('-N', "--N", required=False, default=120, type=int, help="Number of mesh intervals in x and y dimensions")
