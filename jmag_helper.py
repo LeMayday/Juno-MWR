@@ -20,20 +20,29 @@ def init_jm_config():
 
 
 def B(X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> np.ndarray:
-    Bx_int, By_int, Bz_int = jm.Internal.Field(X, Y, Z)
-    Bx_ext, By_ext, Bz_ext = jm.Con2020.Field(X, Y, Z)
-    return np.stack((Bx_int + Bx_ext, By_int + By_ext, Bz_int + Bz_ext), axis=-1).astype(np.float32)
+    assert X.shape == Y.shape == Z.shape
+    XYZ = np.stack([X, Y, Z], axis=-1)
+    # B-field model only operates on inputs as 1D vectors. This ensures contiguous memory layout
+    XYZ_flat = np.ascontiguousarray(XYZ.reshape(-1, 3), dtype=np.float32)
+    Bx_int, By_int, Bz_int = jm.Internal.Field(XYZ_flat[:, 0], XYZ_flat[:, 1], XYZ_flat[:, 2])
+    Bx_ext, By_ext, Bz_ext = jm.Con2020.Field(XYZ_flat[:, 0], XYZ_flat[:, 1], XYZ_flat[:, 2])
+    B_list = np.stack((Bx_int + Bx_ext, By_int + By_ext, Bz_int + Bz_ext), axis=-1).astype(np.float32)
+    return B_list.reshape((*X.shape, 3))    # reshape back to match input
 
 
 def batch_equator(R: np.ndarray) -> np.ndarray:
     # r represents positions, with x,y,z, along last axis
-    out = np.empty((*R.shape[:-1], 5), dtype=np.float32)    # out is size of R domain with x3, y3, z3, M, lon fields
-    Teq = jm.TraceField(R[..., 0], R[..., 1], R[..., 2], Verbose=False, IntModel='jrm33', ExtModel='Con2020', MaxStep=0.01).equator
-    out[..., :3] = np.stack((Teq.x3, Teq.y3, Teq.z3), axis=-1)
-    out[..., -2] = Teq.mshell
-    out[..., -1] = np.mod(Teq.mlone, 2*np.pi)               # mlone returns lon in radians from [-pi, pi]. (lon + 2pi) % 2pi
-    return out
+    # B-field model only operates on inputs as 1D vectors. This ensures contiguous memory layout
+    R_flat = np.ascontiguousarray(R.reshape(-1, 3), dtype=np.float32)
+    Teq = jm.TraceField(R_flat[:, 0], R_flat[:, 1], R_flat[:, 2], Verbose=False, IntModel='jrm33', ExtModel='Con2020', MaxStep=0.1).equator
 
+    out_flat = np.empty((R_flat.shape[0], 5), dtype=np.float32)     # out is size of R with x3, y3, z3, M, lon fields
+    out_flat[:, 0] = Teq.x3
+    out_flat[:, 1] = Teq.y3
+    out_flat[:, 2] = Teq.z3
+    out_flat[:, 3] = Teq.mshell
+    out_flat[:, 4] = np.mod(Teq.mlone, 2*np.pi)     # mlone returns lon in radians from [-pi, pi]. (lon + 2pi) % 2pi
+    return out_flat.reshape((*R.shape[:-1], 5))     # reshape back to original R shape
 
 def tracefield_chunked(X, Y, Z, n_splits=3):
     """
