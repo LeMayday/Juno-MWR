@@ -9,6 +9,7 @@ from synchrotron_map import RJ
 import argparse
 import concurrent.futures
 import os
+import sys
 
 MAX_WORKERS = max(1, os.cpu_count() - 2)
 TWO_D_NDArray = np.ndarray[tuple[int, int], np.dtype[np.float32]]
@@ -69,12 +70,17 @@ def recombine_chunked_data(flat_results, n_splits):
     return np.concatenate(list_of_xs, axis=0)
 
 
-def tracefield_chunked(X, Y, Z, n_splits=3):
+def tracefield_chunked(X, Y, Z, n_splits):
     """
-    Splits 3D coordinate grids (X, Y, Z) into n_splits along each axis (default 3x3x3=27),
-    evaluates TraceField on each chunk, and concatenates the resulting .equator fields.
+    Splits 3D coordinate grids (X, Y, Z) into n_splits along each axis, evaluates
+    TraceField on each chunk, and concatenates the resulting .equator fields.
     """
     flat_chunks = chunk_and_flatten_3D(X, Y, Z, n_splits)
+
+    # keep this code in case multithreading doesn't work
+    # flat_results = []
+    # for i, chunk in enumerate(flat_chunks):
+    #     flat_results.append(batch_equator(chunk))
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS, initializer=init_jm_config) as executor:
         flat_results = list(executor.map(batch_equator, flat_chunks))
@@ -142,12 +148,13 @@ def test_Bfield_trace_chunking():
     Mshell_not_chunked[Mshell_not_chunked < 0.5] = np.nan
     Mshell_not_chunked = np.nan_to_num(Mshell_not_chunked)
     assert np.count_nonzero(~np.isclose(Mshell_chunked, Mshell_not_chunked)) == 0
-    print("Test passed!")
+    print("Bfield_trace_chunking test passed!")
 
 
 def main():
-    test_chunking_and_recombining()
-    # test_Bfield_trace_chunking()
+    if len(sys.argv) == 1:
+        test_chunking_and_recombining()
+        test_Bfield_trace_chunking()
     parser = argparse.ArgumentParser()
     parser.add_argument("--Mmax", required=True, type=float, help="Max RJ distance of mesh")
     parser.add_argument('-N', "--N", required=False, default=120, type=int, help="Number of mesh intervals in x and y dimensions")
