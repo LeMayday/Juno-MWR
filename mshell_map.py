@@ -172,7 +172,10 @@ def main():
 
     # construct RegularGridInterpolators for each mesh value
     mesh_data = np.load(args.mesh_file)
-    points = mesh_data["points"]
+    x_vec = mesh_data["x_vec"]
+    y_vec = mesh_data["y_vec"]
+    z_vec = mesh_data["z_vec"]
+    points = (x_vec, y_vec, z_vec)
     UGLI_B =   UGLI(points=points, values=mesh_data["B_mesh"])
     UGLI_Beq = UGLI(points=points, values=mesh_data["B_mesh_eq"])
     UGLI_M =   UGLI(points=points, values=mesh_data["Mshell"])

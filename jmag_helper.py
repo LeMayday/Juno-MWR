@@ -117,7 +117,6 @@ def generate_Bfield_mesh(M_max: float, N: float = 120):
     Mshell = eq_data[..., -2]
     dipole_lon = eq_data[..., -1]
     dipole_xy = np.stack((np.cos(dipole_lon), np.sin(dipole_lon)), axis=-1)     # dipole_lon is dicontinuous and not interpolatable
-    points = (x_vec, y_vec, z_vec)
 
     jupiter_mask = X**2 + Y**2 + (Z / RJ_polar_ratio)**2 <= 1
     B_mesh[jupiter_mask, :] = np.nan
@@ -125,7 +124,8 @@ def generate_Bfield_mesh(M_max: float, N: float = 120):
     Mshell[jupiter_mask] = np.nan
     dipole_xy[jupiter_mask, :] = np.nan
 
-    np.savez("B-mesh_Mmax-{M_max}_N-{N}.npz", points=points, B_mesh=B_mesh, B_mesh_eq=B_mesh_eq, Mshell=Mshell, dipole_xy=dipole_xy)  # all are float32
+    np.savez(f"B-mesh_Mmax-{M_max}_N-{N}.npz", x_vec=x_vec, y_vec=y_vec, z_vec=z_vec,
+             B_mesh=B_mesh, B_mesh_eq=B_mesh_eq, Mshell=Mshell, dipole_xy=dipole_xy)  # all are float32
 
 
 def test_chunking_and_recombining():
