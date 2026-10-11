@@ -4,6 +4,7 @@ import JupiterMag as jm
 
 # local files
 from synchrotron_map import RJ
+from mshell_map import THREE_D_NDArray, FOUR_D_NDArray
 
 # default
 import argparse
@@ -12,7 +13,6 @@ import os
 import sys
 
 MAX_WORKERS = max(1, os.cpu_count() - 2)
-TWO_D_NDArray = np.ndarray[tuple[int, int], np.dtype[np.float32]]
 RJ_polar_ratio = 66854 / RJ
 
 def init_jm_config():
@@ -20,7 +20,10 @@ def init_jm_config():
     jm.Internal.Config(Model="jrm33", CartesianIn=True, CartesianOut=True)
 
 
-def B(X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> np.ndarray:
+def B(X: THREE_D_NDArray, Y: THREE_D_NDArray, Z: THREE_D_NDArray) -> FOUR_D_NDArray:
+    """
+    Compute JRM33 + Con2020 B-field
+    """
     assert X.shape == Y.shape == Z.shape
     XYZ = np.stack([X, Y, Z], axis=-1)
     # B-field model only operates on inputs as 1D vectors. This ensures contiguous memory layout
@@ -31,7 +34,11 @@ def B(X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> np.ndarray:
     return B_list.reshape((*X.shape, 3))    # reshape back to match input
 
 
-def batch_equator(R: np.ndarray) -> np.ndarray:
+def batch_equator(R: FOUR_D_NDArray) -> FOUR_D_NDArray:
+    """
+    Compute equator positions, Mshell, and longitude for given batch of positions
+    (with x,y,z along last axis).
+    """
     # r represents positions, with x,y,z, along last axis
     # B-field model only operates on inputs as 1D vectors. This ensures contiguous memory layout
     R_flat = np.ascontiguousarray(R.reshape(-1, 3), dtype=np.float32)
@@ -46,7 +53,10 @@ def batch_equator(R: np.ndarray) -> np.ndarray:
     return out_flat.reshape((*R.shape[:-1], 5))     # reshape back to original R shape
 
 
-def chunk_and_flatten_3D(X, Y, Z, n_splits):
+def chunk_and_flatten_3D(X: THREE_D_NDArray, Y: THREE_D_NDArray, Z: THREE_D_NDArray, n_splits: int) -> list[FOUR_D_NDArray]:
+    """
+    Break 3D domain into chunks (n_splits along each dimension) and return 1D of chunks (last dimension contiguous).
+    """
     XYZ = np.stack([X, Y, Z], axis=-1)
     flat_chunks = [
         chunk
@@ -57,7 +67,10 @@ def chunk_and_flatten_3D(X, Y, Z, n_splits):
     return flat_chunks
 
 
-def recombine_chunked_data(flat_results, n_splits):
+def recombine_chunked_data(flat_results: list[FOUR_D_NDArray], n_splits: int) -> FOUR_D_NDArray:
+    """
+    Recombine chunked data into original domain
+    """
     list_of_xs = []
     for i in range(n_splits):
         idx_x = i * n_splits**2
@@ -65,12 +78,12 @@ def recombine_chunked_data(flat_results, n_splits):
         for j in range(n_splits):
             idx_j = j * n_splits
             idx_start = idx_x + idx_j
-            list_of_ys.append(np.concatenate(flat_results[idx_start : idx_start + n_splits], axis=2))    # combine across z
-        list_of_xs.append(np.concatenate(list_of_ys, axis=1))
-    return np.concatenate(list_of_xs, axis=0)
+            list_of_ys.append(np.concatenate(flat_results[idx_start : idx_start + n_splits], axis=2))   # combine across z
+        list_of_xs.append(np.concatenate(list_of_ys, axis=1))                                           # combine across y
+    return np.concatenate(list_of_xs, axis=0)                                                           # combine across x
 
 
-def tracefield_chunked(X, Y, Z, n_splits):
+def tracefield_chunked(X: THREE_D_NDArray, Y: THREE_D_NDArray, Z: THREE_D_NDArray, n_splits: int) -> FOUR_D_NDArray:
     """
     Splits 3D coordinate grids (X, Y, Z) into n_splits along each axis, evaluates
     TraceField on each chunk, and concatenates the resulting .equator fields.

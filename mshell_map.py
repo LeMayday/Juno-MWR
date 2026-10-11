@@ -13,8 +13,10 @@ from synchrotron_map import parse_PJs, stack_data, RJ
 import argparse
 import pickle
 
-TWO_D_NDArray = np.ndarray[tuple[int, int], np.dtype[np.float32]]
+ONE_D_NDArray   = np.ndarray[tuple[int,], np.dtype[np.float32]]
+TWO_D_NDArray   = np.ndarray[tuple[int, int], np.dtype[np.float32]]
 THREE_D_NDArray = np.ndarray[tuple[int, int, int], np.dtype[np.float32]]
+FOUR_D_NDArray  = np.ndarray[tuple[int, int, int, int], np.dtype[np.float32]]
 COLS_GRDR = ['t_ephem_time', 't_utc_doy',
              'PC_lon_JsB1', 'PC_lon_JsB2',
              'S3RH_x_B1', 'S3RH_y_B1', 'S3RH_z_B1', 'S3RH_x_B2', 'S3RH_y_B2', 'S3RH_z_B2',
@@ -55,9 +57,9 @@ class UniformGridLinearInterpolator:
 UGLI = UniformGridLinearInterpolator  # type alias
 
 
-def intersect_alphas_lons(r_sc: TWO_D_NDArray, r_b: TWO_D_NDArray, s: np.ndarray,
+def intersect_alphas_lons(r_sc: TWO_D_NDArray, r_b: TWO_D_NDArray, s: ONE_D_NDArray,
                           UGLI_M: UGLI, UGLI_B: UGLI, UGLI_Beq: UGLI, UGLI_lon: UGLI,
-                          M: float, dM: float):
+                          M: float, dM: float) -> tuple[ONE_D_NDArray, ONE_D_NDArray, ONE_D_NDArray, TWO_D_NDArray]:
     # r_sc is vector of normalized S/C pos vectors in SIII
     # r_b is vector of normalized boresight vectors in SIII
     # s_los is distance along line of sight
@@ -113,14 +115,14 @@ def plot_points(r_mesh: TWO_D_NDArray, r_sc: TWO_D_NDArray, los_mask: np.ndarray
         pickle.dump(fig, f)
 
 
-def mask_M(Jn_SIII: TWO_D_NDArray, UGLI_M: UGLI, M: float) -> np.ndarray:
+def mask_M(Jn_SIII: TWO_D_NDArray, UGLI_M: UGLI, M: float) -> ONE_D_NDArray:
     # inputs are Juno positions in SIII / RJ, an interpolator for Mshell on the mesh, and the desired M shell
     # Jn_SIII is # num samples x 3
     Jn_Ms = UGLI_M(Jn_SIII)
     return np.logical_and(Jn_Ms > 1.01, Jn_Ms < M * 0.98)
 
 
-def mask_jupiter(jupiter_intersections: np.ndarray) -> np.ndarray:
+def mask_jupiter(jupiter_intersections: ONE_D_NDArray) -> ONE_D_NDArray:
     # filter out views of Jupiter --- 12 deg/s, so ~1-2 sec for whole beam width to be off Jupiter -> 10-20 extra samples
     n_extra = 15                                                                            # 15 extra samples
     jupiter_mask = ~np.isnan(jupiter_intersections)                                         # masks for where antenna beam is looking at Jupiter
@@ -128,7 +130,7 @@ def mask_jupiter(jupiter_intersections: np.ndarray) -> np.ndarray:
     return jupiter_mask
 
 
-def bin_data(T_a: np.ndarray, lons: np.ndarray, alphas: np.ndarray) -> np.ndarray:
+def bin_data(T_a: ONE_D_NDArray, lons: ONE_D_NDArray, alphas: ONE_D_NDArray) -> TWO_D_NDArray:
     # longitudes in degrees!
     lon_bins = np.linspace(0, 360, 181, endpoint=True)
     alpha_bins = np.linspace(0, 90, 91, endpoint=True)
@@ -136,7 +138,7 @@ def bin_data(T_a: np.ndarray, lons: np.ndarray, alphas: np.ndarray) -> np.ndarra
     return med
 
 
-def plot_data(data: np.ndarray, chs: list, params_str: str, vmax: list = None):
+def plot_data(data: THREE_D_NDArray, chs: list, params_str: str, vmax: list = None):
     fig = plt.figure(figsize=(18,8))
     axes = make_subplots(fig, data.shape[0])
     for i, ax in enumerate(axes):
