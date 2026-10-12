@@ -134,11 +134,15 @@ def mask_jupiter(jupiter_intersections: ONE_D_NDArray) -> ONE_D_NDArray:
     return jupiter_mask
 
 
-def bin_data(T_a: ONE_D_NDArray, lons: ONE_D_NDArray, alphas: ONE_D_NDArray) -> TWO_D_NDArray:
+def bin_data(values: ONE_D_NDArray, lons: ONE_D_NDArray, alphas: ONE_D_NDArray) -> TWO_D_NDArray:
     # longitudes in degrees!
     lon_bins = np.linspace(0, 360, 181, endpoint=True)
     alpha_bins = np.linspace(0, 90, 91, endpoint=True)
-    med, _, _, _ = binned_statistic_2d(x=lons, y=alphas, values=T_a, statistic="median", bins=[lon_bins, alpha_bins])
+    bad_input = np.logical_or(np.isnan(lons), np.isnan(alphas))
+    values = values[~bad_input]
+    lons = lons[~bad_input]
+    alphas = alphas[~bad_input]
+    med, _, _, _ = binned_statistic_2d(x=lons, y=alphas, values=values, statistic="median", bins=[lon_bins, alpha_bins])
     return med
 
 
