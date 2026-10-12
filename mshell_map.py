@@ -13,6 +13,7 @@ from coordinates import pos_to_angle
 # default
 import argparse
 import pickle
+from pathlib import Path
 
 ONE_D_NDArray   = np.ndarray[tuple[int,], np.dtype[np.float32]]
 TWO_D_NDArray   = np.ndarray[tuple[int, int], np.dtype[np.float32]]
@@ -22,6 +23,7 @@ COLS_GRDR = ['t_ephem_time', 't_utc_doy',
              'PC_lon_JsB1', 'PC_lon_JsB2',
              'S3RH_x_B1', 'S3RH_y_B1', 'S3RH_z_B1', 'S3RH_x_B2', 'S3RH_y_B2', 'S3RH_z_B2',
              'range_JnJc', 'S3RH_x_JcJn', 'S3RH_y_JcJn', 'S3RH_z_JcJn']
+IM_PATH = "images/mshell_map"
 
 
 class UniformGridLinearInterpolator:
@@ -146,7 +148,7 @@ def bin_data(values: ONE_D_NDArray, lons: ONE_D_NDArray, alphas: ONE_D_NDArray) 
     return med
 
 
-def plot_data(data: THREE_D_NDArray, chs: list, params_str: str, vmax: list = None):
+def plot_data(data: THREE_D_NDArray, chs: list, params_str: str, vmax: list = None, BLC_file: str = None, save_path: str = IM_PATH):
     fig = plt.figure(figsize=(18,8))
     axes = make_subplots(fig, data.shape[0])
     for i, ax in enumerate(axes):
@@ -155,11 +157,20 @@ def plot_data(data: THREE_D_NDArray, chs: list, params_str: str, vmax: list = No
         else:
             im = ax.imshow(data[i, :], origin='lower', cmap='gist_ncar', aspect='auto', extent=[0, 360, 0, 90])
         fig.colorbar(im, ax=ax)
+        if BLC_file is not None:
+            BLC_data = np.loadtxt(BLC_file)
+            lons = BLC_data[:, 0]
+            BLC_N = BLC_data[:, 1]
+            BLC_S = BLC_data[:, 2]
+            ax.plot(lons, BLC_N, linestyle='-')
+            ax.plot(lons, BLC_S, linestyle='--')
+            ax.axhline(np.max(BLC_data[:, 1:]), linestyle='dotted')
         ax.set_title(f"Ch{chs[i]}")
         ax.set_xlabel("JRM33 Dipole Longitude")
         ax.set_ylabel("$\\alpha_{eq}$")
     fig.tight_layout()
-    fig.savefig(f"MWR_{params_str}.png", dpi=300)
+    fig.savefig(f"{save_path}/MWR_{params_str}.png", dpi=300)
+    plt.close(fig)
 
 
 def main():
@@ -190,6 +201,8 @@ def main():
     UGLI_lonxy = UGLI(points=points, values=mesh_data["dipole_xy"])
 
     for M in Ms:
+        save_path = f"{IM_PATH}/{M}"
+        Path(save_path).mkdir(parents=True, exist_ok=True)
         # create numpy array that is (#chs, #alpha, #lon, #pjs) so i can take median over pjs
         series_Ta = np.full((len(chs), 90, 180, len(pjs)), np.nan)      # longitudes as cols for plotting; initialize as NaNs
         series_alpha = np.full_like(series_Ta, np.nan)
@@ -246,16 +259,23 @@ def main():
         print(f"Data compilation finished. Skipped PJs: {skipped_PJs}")
 
         params_str = f"PJs{args.PJs}_CHs{args.ch}_M{M}_dt{args.dt}"
-        np.save(f"MWR_Ta_series_{params_str}.npy", series_Ta)
-        np.save(f"MWR_alpha_series_{params_str}.npy", series_alpha)
+        np.save(f"npy/MWR_Ta_series_{params_str}.npy", series_Ta)
+        np.save(f"npy/MWR_alpha_series_{params_str}.npy", series_alpha)
+
+        for pj in range(series_Ta.shape[-1]):
+            if pj+1 in skipped_PJs: continue
+            plot_data(series_Ta[..., pj], chs, f"Ta_series_PJ{pj+1}_CHs{args.ch}_M{M}_dt{args.dt}", save_path=save_path)
 
         stacked_Ta_data = stack_data(series_Ta)
         stacked_alpha_data = stack_data(series_alpha)
 
-        np.save(f"MWR_Ta_stacked_{params_str}.npy", stacked_Ta_data)
-        np.save(f"MWR_alpha_stacked_{params_str}.npy", stacked_alpha_data)
-        plot_data(stacked_Ta_data, chs, f"Ta_series_{params_str}")
-        plot_data(stacked_alpha_data, chs, f"alpha_series_{params_str}")
+        np.save(f"npy/MWR_Ta_stacked_{params_str}.npy", stacked_Ta_data)
+        np.save(f"npy/MWR_alpha_stacked_{params_str}.npy", stacked_alpha_data)
+        vmax = np.array([5000, 1100, 250, 70, 25, 15])[chs - 1]
+
+        BLC_file = f"BLC_M{int(M)}.txt" if M in [2, 3, 5, 10] else None
+        plot_data(stacked_Ta_data, chs, f"Ta_series_{params_str}", vmax=vmax, BLC_file=BLC_file, save_path=save_path)
+        plot_data(stacked_alpha_data, chs, f"alpha_series_{params_str}", save_path=save_path)
 
 
 if __name__ == "__main__":
