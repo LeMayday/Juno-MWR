@@ -93,34 +93,6 @@ def intersect_alphas_lons(r_sc: TWO_D_NDArray, r_b: TWO_D_NDArray, s: ONE_D_NDAr
     return np.rad2deg(alpha_data), np.rad2deg(alpha_eq_data), lon_data, Mshell_intersect_pts    # return everything in degrees
 
 
-def plot_points(r_mesh: TWO_D_NDArray, r_sc: TWO_D_NDArray, los_mask: np.ndarray, M: float, pj: int):
-    fig = plt.figure()
-    ax1 = fig.add_subplot(121, projection='3d')
-    ax2 = fig.add_subplot(122, projection='3d')
-
-    # plot Jupiter
-    RJ_polar_ratio = 66854 / RJ
-    th = np.linspace(0, np.pi, 50)
-    phi = np.linspace(0, 2*np.pi, 50)
-    x = np.outer(np.cos(phi), np.sin(th))
-    y = np.outer(np.sin(phi), np.sin(th))
-    z = np.outer(np.ones(np.size(phi)), np.cos(th)) / RJ_polar_ratio**2
-    ax1.plot_surface(x, y, z, edgecolor='None')
-    ax2.plot_surface(x, y, z, edgecolor='None')
-
-    # plot viewed points
-    ax1.scatter(*(r_mesh[los_mask, :].T), color='red', marker='.', s=50)
-    # plot M-shell mesh
-    ax2.scatter(*r_mesh.T, color='blue', marker='.')
-
-    # plot Juno trajectory
-    ax1.plot(*r_sc.T, color='black')
-    ax2.plot(*r_sc.T, color='black')
-
-    with open(f"pickle/interactive_plot_M{M}_pj{pj}.pickle", "wb") as f:
-        pickle.dump(fig, f)
-
-
 def mask_M(Jn_SIII: TWO_D_NDArray, UGLI_M: UGLI, M: float) -> ONE_D_NDArray:
     # inputs are Juno positions in SIII / RJ, an interpolator for Mshell on the mesh, and the desired M shell
     # Jn_SIII is # num samples x 3
