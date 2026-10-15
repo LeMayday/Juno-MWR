@@ -1,5 +1,9 @@
+# modules
 import numpy as np
 import plotly.graph_objects as go
+
+# local files
+from jmag_helper import RJ_polar_ratio
 
 
 def create_3d_time_viewer(
@@ -68,7 +72,7 @@ def create_3d_time_viewer(
 
     sphere_x = np.sin(phi_grid) * np.cos(theta_grid)
     sphere_y = np.sin(phi_grid) * np.sin(theta_grid)
-    sphere_z = np.cos(phi_grid)
+    sphere_z = np.cos(phi_grid) * RJ_polar_ratio
 
     sphere_trace = go.Surface(
         x=sphere_x,
