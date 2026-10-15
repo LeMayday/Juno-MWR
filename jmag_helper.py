@@ -118,7 +118,7 @@ def generate_Bfield_mesh(M_max: float, N: float = 120):
     dipole_lon = eq_data[..., -1]
     dipole_xy = np.stack((np.cos(dipole_lon), np.sin(dipole_lon)), axis=-1)     # dipole_lon is dicontinuous and not interpolatable
 
-    jupiter_mask = X**2 + Y**2 + (Z / RJ_polar_ratio)**2 <= 1
+    jupiter_mask = X**2 + Y**2 + (Z / RJ_polar_ratio)**2 < 1
     B_mesh[jupiter_mask, :] = np.nan
     B_mesh_eq[jupiter_mask, :] = np.nan
     Mshell[jupiter_mask] = np.nan
