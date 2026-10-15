@@ -333,12 +333,6 @@ def create_3d_time_viewer(
         updatemenus=[],
     )
 
-    # if output_html is not None:
-    #     fig.write_html(
-    #         output_html,
-    #         include_plotlyjs=True,
-    #         auto_open=False,
-    #     )
     wasd_camera_script = r"""
     (function () {
         const gd = document.getElementById('{plot_id}');
@@ -693,11 +687,6 @@ def create_3d_time_viewer(
         });
     })();
     """
-
-    playback_controls_script = playback_controls_script.replace(
-        "__BASE_FRAME_DURATION__",
-        str(frame_duration_ms),
-    )
 
     if output_html is not None:
         playback_script_for_figure = playback_controls_script.replace(
