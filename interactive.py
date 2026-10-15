@@ -756,9 +756,9 @@ def main():
     args = parser.parse_args()
 
     fname_split = args.file.split('_')
-    M = fname_split[2]
-    pj = fname_split[3]
-    ch = fname_split[4]
+    M_str = fname_split[2]
+    pj_str = fname_split[3]
+    ch_str = fname_split[4]
 
     data = np.load(args.file)
     r_sc = data["r_sc"][::10]
@@ -766,7 +766,7 @@ def main():
     r_los = data["r_los"][::10]
     r_los_mask = data["r_los_mask"][::10]
 
-    title = f"Juno_M{M}_PJ{pj}_CH{ch}"
+    title = f"Juno_{M_str}_{pj_str}_{ch_str}"
 
     create_3d_time_viewer(
         r_sc,
