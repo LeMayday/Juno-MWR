@@ -92,6 +92,32 @@ def create_3d_time_viewer(
         ),
     )
 
+    sc_trajectory = go.Scatter3d(
+        x=A[:, 0],
+        y=A[:, 1],
+        z=A[:, 2],
+        mode="lines",
+        line=dict(color="black", width=2),
+        name="Juno trajectory",
+        hoverinfo="skip",
+    )
+
+    C_flat = C[D, :]
+    points_trace = go.Scatter3d(
+        x=C_flat[:, 0],
+        y=C_flat[:, 1],
+        z=C_flat[:, 2],
+        mode="markers",
+        marker=dict(
+            size=1,
+            color="darkorange",
+            opacity=0.9,
+            line=dict(color="black", width=0.5),
+        ),
+        name="All M-shell intersections",
+        hoverinfo="skip",
+    )
+
     def traces_for_time(t):
         """Create the dynamic traces for a particular time index."""
         position = A[t]
@@ -119,7 +145,7 @@ def create_3d_time_viewer(
                 color="crimson",
                 line=dict(color="black", width=1),
             ),
-            name="A",
+            name="Juno",
             customdata=[[t]],
             hovertemplate=(
                 "A<br>"
@@ -137,7 +163,7 @@ def create_3d_time_viewer(
             z=[position[2], endpoint[2]],
             mode="lines",
             line=dict(color="royalblue", width=8),
-            name="B",
+            name="Boresight",
             hoverinfo="skip",
         )
 
@@ -175,7 +201,7 @@ def create_3d_time_viewer(
                 opacity=0.9,
                 line=dict(color="black", width=0.5),
             ),
-            name="Valid C points",
+            name="M-shell intersections",
             customdata=np.full((len(cx), 1), t),
             hovertemplate=(
                 "C point<br>"
@@ -231,7 +257,7 @@ def create_3d_time_viewer(
     # Initial traces, including the static sphere.
     initial_dynamic_traces = traces_for_time(0)
     fig = go.Figure(
-        data=initial_dynamic_traces + [sphere_trace]
+        data=initial_dynamic_traces + [sphere_trace, sc_trajectory, points_trace]
     )
 
     # Each frame updates only the first four dynamic traces.
