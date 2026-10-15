@@ -221,3 +221,7 @@ data
 .vscode
 *.png
 *.pickle
+npy
+npz
+*.npy
+*.npz
