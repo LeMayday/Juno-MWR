@@ -12,7 +12,6 @@ from coordinates import pos_to_angle
 
 # default
 import argparse
-import pickle
 from pathlib import Path
 
 ONE_D_NDArray   = np.ndarray[tuple[int,], np.dtype[np.float32]]
@@ -89,8 +88,7 @@ def intersect_alphas_lons(r_sc: TWO_D_NDArray, r_b: TWO_D_NDArray, s: ONE_D_NDAr
     alpha_data = np.nanmean(alpha_los, axis=-1)
     alpha_eq_data = np.nanmean(alpha_eq_los, axis=-1)
     lon_data = np.nanmean(lon_los, axis=-1)
-    Mshell_intersect_pts = r_los[mask_M, :]             # physical points where Mshell was intersected (for plotting)
-    return np.rad2deg(alpha_data), np.rad2deg(alpha_eq_data), lon_data, Mshell_intersect_pts    # return everything in degrees
+    return np.rad2deg(alpha_data), np.rad2deg(alpha_eq_data), lon_data, r_los, mask_M    # return everything in degrees
 
 
 def mask_M(Jn_SIII: TWO_D_NDArray, UGLI_M: UGLI, M: float) -> ONE_D_NDArray:
@@ -206,21 +204,23 @@ def main():
             print("Calculating intersections")
             s = np.linspace(0, 7, 100)                              # LOS distance
             if 1 in chs:
-                alphas1, alphas_eq1, lons1, pos1 = intersect_alphas_lons(r_sc=Jn_SIII_ch1, r_b=boresight_SIII_1, s=s,
+                alphas1, alphas_eq1, lons1, r_los1, r_los_mask1 = intersect_alphas_lons(r_sc=Jn_SIII_ch1, r_b=boresight_SIII_1, s=s,
                                                                          UGLI_M=UGLI_M, UGLI_B=UGLI_B, UGLI_Beq=UGLI_Beq, UGLI_lonxy=UGLI_lonxy,
                                                                          M=M, dM=0.05)
             if (len(chs) == 1 and chs[0] != 1) or len(chs) > 1:
-                alphas2, alphas_eq2, lons2, pos2 = intersect_alphas_lons(r_sc=Jn_SIII_ch2, r_b=boresight_SIII_2, s=s,
+                alphas2, alphas_eq2, lons2, r_los2, r_los_mask2 = intersect_alphas_lons(r_sc=Jn_SIII_ch2, r_b=boresight_SIII_2, s=s,
                                                                          UGLI_M=UGLI_M, UGLI_B=UGLI_B, UGLI_Beq=UGLI_Beq, UGLI_lonxy=UGLI_lonxy,
                                                                          M=M, dM=0.05)
             print("Binning")
             for ch in chs:
                 Ta = IRDR_data_pj[f"Ch{ch}"]    # antenna temperature
                 if ch == 1:
-                    alphas, alphas_eq, lons, pos = alphas1, alphas_eq1, lons1, pos1
+                    alphas, alphas_eq, lons = alphas1, alphas_eq1, lons1
+                    np.savez(f"npz/MWR_plottables_M{M}_PJ{pj}_CH{1}.npz", r_sc=Jn_SIII_ch1, r_b=boresight_SIII_1, r_los=r_los1, r_los_mask=r_los_mask1)
                     Ta = Ta[mask1]
                 else:   # I do filtering outside of this loop so I don't redo work for each ch > 1
-                    alphas, alphas_eq, lons, pos = alphas2, alphas_eq2, lons2, pos2
+                    alphas, alphas_eq, lons = alphas2, alphas_eq2, lons2
+                    np.savez(f"npz/MWR_plottables_M{M}_PJ{pj}_CH{2}.npz", r_sc=Jn_SIII_ch2, r_b=boresight_SIII_2, r_los=r_los2, r_los_mask=r_los_mask2)
                     Ta = Ta[mask2]
                 assert Ta.shape == alphas_eq.shape == lons.shape, "Ta, alphas, and lons must have same shape!"
 
