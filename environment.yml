@@ -8,6 +8,7 @@ dependencies:
   - matplotlib
   - astropy
   - scipy
+  - plotly
   - pip
   - pip:
     - requests
