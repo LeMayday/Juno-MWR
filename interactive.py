@@ -593,7 +593,7 @@ def create_3d_time_viewer(
         speedSlider.id = 'plotly-speed-slider-{plot_id}';
         speedSlider.type = 'range';
         speedSlider.min = '0.25';
-        speedSlider.max = '4.0';
+        speedSlider.max = '1.0';
         speedSlider.step = '0.25';
         speedSlider.value = '1.0';
         speedSlider.style.width = '160px';
