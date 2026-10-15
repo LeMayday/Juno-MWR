@@ -225,3 +225,4 @@ npy
 npz
 *.npy
 *.npz
+*.html
