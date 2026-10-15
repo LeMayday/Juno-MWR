@@ -7,6 +7,7 @@ def create_3d_time_viewer(
     B,
     C,
     D,
+    title,
     frame_duration_ms=100,
     output_html=None,
 ):
@@ -24,6 +25,8 @@ def create_3d_time_viewer(
         Candidate points at each time step.
     D : array_like, shape (N, M)
         Boolean mask. C[t, j] is displayed only when D[t, j] is True.
+    title : str
+        Title for viewer
     frame_duration_ms : int, optional
         Duration of each frame during playback.
     output_html : str or None, optional
@@ -255,7 +258,7 @@ def create_3d_time_viewer(
 
     fig.update_layout(
         title=dict(
-            text="Interactive 3D Time-Series Viewer",
+            text=title,
             x=0.5,
             xanchor="center",
         ),
@@ -714,6 +717,7 @@ def main():
         B,
         C,
         D,
+        title="Interactive 3D Time-Series Viewer",
         frame_duration_ms=75,
         output_html="viewer.html",  # Optional
     )
