@@ -5,6 +5,10 @@ import plotly.graph_objects as go
 # local files
 from jmag_helper import RJ_polar_ratio
 
+# default
+import argparse
+import sys
+
 
 def create_3d_time_viewer(
     A,
@@ -707,7 +711,7 @@ def create_3d_time_viewer(
     return fig
 
 
-def main():
+def test():
     N = 100
     M = 30
 
@@ -742,6 +746,37 @@ def main():
     )
 
     fig.show()
+
+
+def main():
+    if len(sys.argv) == 1:
+        test()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-f", "--file", required=True, type=str, help="Input npz file")
+    args = parser.parse_args()
+
+    fname_split = args.file.split('_')
+    M = fname_split[2]
+    pj = fname_split[3]
+    ch = fname_split[4]
+
+    data = np.load(args.file)
+    r_sc = data["r_sc"][::10]
+    r_b = data["r_b"][::10]
+    r_los = data["r_los"][::10]
+    r_los_mask = data["r_los_mask"][::10]
+
+    title = f"Juno_M{M}_PJ{pj}_CH{ch}"
+
+    create_3d_time_viewer(
+        r_sc,
+        r_b,
+        r_los,
+        r_los_mask,
+        title=title,
+        frame_duration_ms=75,
+        output_html=f"{title}.html",  # Optional
+    )
 
 
 if __name__ == "__main__":
