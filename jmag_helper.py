@@ -42,7 +42,8 @@ def batch_equator(R: FOUR_D_NDArray) -> FOUR_D_NDArray:
     # r represents positions, with x,y,z, along last axis
     # B-field model only operates on inputs as 1D vectors. This ensures contiguous memory layout
     R_flat = np.ascontiguousarray(R.reshape(-1, 3), dtype=np.float32)
-    Teq = jm.TraceField(R_flat[:, 0], R_flat[:, 1], R_flat[:, 2], Verbose=False, IntModel='jrm33', ExtModel='Con2020', MaxStep=0.1).equator
+    Teq = jm.TraceField(R_flat[:, 0], R_flat[:, 1], R_flat[:, 2], Verbose=False, IntModel='jrm33', ExtModel='Con2020',
+                        InitStep=0.005, MinStep=0.001, ErrMax=1e-10, MaxLen=20000, TraceDir='both',).equator
 
     out_flat = np.empty((R_flat.shape[0], 5), dtype=np.float32)     # out is size of R with x3, y3, z3, M, lon fields
     out_flat[:, 0] = Teq.x3
