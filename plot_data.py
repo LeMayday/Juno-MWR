@@ -14,6 +14,8 @@ from coordinates import get_PJ_time_ET
 import argparse
 from typing import Optional
 
+PJ_dspr = np.array([[1, 307]])
+
 
 def fill_missing_data(data: pd.DataFrame) -> pd.DataFrame:
     # MWR_SIS specifies that every 6th sample is skipped when returning data in full data mode
@@ -80,10 +82,9 @@ def time_series_plot(IRDR_data_pj: pd.DataFrame, pj: int):
     plt.show()
 
 
-def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame, params_str: str, overlay_type: Optional[str] = None):
+def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame, samples_per_rot, params_str: str, overlay_type: Optional[str] = None):
     IRDR_data_pj = fill_missing_data(IRDR_data_pj)
     GRDR_data_pj = fill_missing_data(GRDR_data_pj)
-    samples_per_rot = 307   # 30.7 s/rot Santos-Costa+2017, 1 sample per 100 ms
     fig = plt.figure(figsize=(12,8))
     axes = make_subplots(fig, len(IRDR_data_pj.columns[2:]))
     for i, ch in enumerate(IRDR_data_pj.columns[2:]):   # skip time columns
@@ -149,13 +150,14 @@ def main():
     parser.add_argument("--dt", required=True, type=float, help="Delta time in minutes")
     parser.add_argument("--ch", required=False, type=str, default="1,2,3,4,5,6", help="List of channels separated by comma")
     parser.add_argument("--type", required=False, type=str, default=None, choices=["SIII", "SIII_NJ", "VIP4", "VIP4_NJ"], help="Contour overlay type")
+    parser.add_argument("--dspr", required=False, type=int, default=307, help="Hundred ms (deciseconds) per rotation")   # 30.7 s/rot Santos-Costa+2017, 1 sample per 100 ms
     args = parser.parse_args()
-    chs = [int(ch) for ch in args.ch.split(',')]
+    chs = np.array([int(ch) for ch in args.ch.split(',')])
     for ch in chs: assert ch in range(1, 7), "Valid channel numbers are 1-6"    # validate channel inputs
 
     IRDR_data_pj, GRDR_data_pj = load_PJ_data(args.PJ, args.dt, np.array(chs))
-    time_series_plot(IRDR_data_pj, args.PJ)
-    banana_plot(IRDR_data_pj, GRDR_data_pj, f"PJs{args.PJ}_CHs{args.ch}_dt{args.dt}", args.type)
+    # time_series_plot(IRDR_data_pj, args.PJ)
+    banana_plot(IRDR_data_pj, GRDR_data_pj, args.dspr, f"PJs{args.PJ}_CHs{args.ch}_dt{args.dt}", args.type)
 
 
 if __name__ == "__main__":
