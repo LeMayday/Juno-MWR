@@ -59,22 +59,48 @@ class UniformGridLinearInterpolator:
 UGLI = UniformGridLinearInterpolator  # type alias
 
 
-def intersect_alphas_lons(r_sc: TWO_D_NDArray, r_b: TWO_D_NDArray, s: ONE_D_NDArray,
+def alpha(r_b: np.ndarray, B: np.ndarray) -> np.ndarray:
+    """
+    r_b: array of boresight vectors
+
+    B: array of B vectors at positions
+    """
+    r_b_norm = r_b / np.linalg.norm(r_b, axis=-1, keepdims=True)
+    b = B / np.linalg.norm(B, axis=-1, keepdims=True)
+    return np.acos(np.einsum('ijk,ik->ij', b, r_b_norm))    # num samples x num LOS pts
+
+
+def alpha_eq(alpha: np.ndarray, Beq: np.ndarray, B: np.ndarray) -> np.ndarray:
+    """
+    alpha: array of local pitch angles
+
+    Beq: array of B vectors at magnetic equator mapped from positions
+
+    B: array of B vectors at positions
+    """
+    # sin^2(alpha) / B = sin^2(alpha_eq) / Beq => sin(alpha_eq) = sin(alpha) * sqrt(Beq / B)
+    return np.asin(np.sin(alpha) * np.sqrt(np.linalg.norm(Beq, axis=-1) / np.linalg.norm(B, axis=-1)))
+
+
+def r_los(r_sc: np.ndarray, r_b: np.ndarray, smin: float, smax: float, sN: int):
+    # r_sc is vector of normalized S/C pos vectors in SIII
+    s = np.linspace(smin, smax, sN + 1)                 # LOS distance
+    s_los = r_b[:, None, :] * s[None, :, None]          # num samples x num LOS pts x 3
+    return r_sc[:, None, :] + s_los                     # add spacecraft positions to LOS points
+
+
+def intersect_alphas_lons(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray,
                           UGLI_M: UGLI, UGLI_B: UGLI, UGLI_Beq: UGLI, UGLI_lonxy: UGLI,
                           M: float, dM: float) -> tuple[ONE_D_NDArray, ONE_D_NDArray, ONE_D_NDArray, TWO_D_NDArray]:
-    # r_sc is vector of normalized S/C pos vectors in SIII
+    # r_los is position at each sample time and at each point along LOS (num samples x num LOS pts x 3)
     # r_b is vector of normalized boresight vectors in SIII
-    # s_los is distance along line of sight
-    s_los = r_b[:, None, :] * s[None, :, None]          # num samples x num LOS pts x 3
-    r_los = r_sc[:, None, :] + s_los                    # add spacecraft positions to LOS points
-    M_los = UGLI_M(r_los)                               # num samples x num LOS pts
+    M_los = UGLI_M(r_los)                                       # num samples x num LOS pts
     mask_M = np.logical_and(M_los > M - dM, M_los < M + dM)     # where the LOS is looking at the desired M-shell
-    B_los = UGLI_B(r_los)                               # num samples x num LOS pts x 3
-    b_los = B_los / np.linalg.norm(B_los, axis=-1, keepdims=True)
-    alpha_los = np.acos(np.einsum('ijk,ik->ij', b_los, r_b))    # num samples x num LOS pts
+    B_los = UGLI_B(r_los)                                       # num samples x num LOS pts x 3
+    alpha_los = alpha(r_b, B_los)
+
     Beq_los = UGLI_Beq(r_los)
-    # sin^2(alpha) / B = sin^2(alpha_eq) / Beq => sin(alpha_eq) = sin(alpha) * sqrt(Beq / B)
-    alpha_eq_los = np.asin(np.sin(alpha_los) * np.sqrt(np.linalg.norm(Beq_los, axis=-1) / np.linalg.norm(B_los, axis=-1)))
+    alpha_eq_los = alpha_eq(alpha_los, Beq_los, B_los)
 
     lonxy_los = UGLI_lonxy(r_los)                                                           # interpolate xy since these are continuous
     _, lon_los_rad = pos_to_angle(lonxy_los[..., 0], lonxy_los[..., 1], 0)
@@ -88,7 +114,7 @@ def intersect_alphas_lons(r_sc: TWO_D_NDArray, r_b: TWO_D_NDArray, s: ONE_D_NDAr
     alpha_data = np.nanmean(alpha_los, axis=-1)
     alpha_eq_data = np.nanmean(alpha_eq_los, axis=-1)
     lon_data = np.nanmean(lon_los, axis=-1)
-    return np.rad2deg(alpha_data), np.rad2deg(alpha_eq_data), lon_data, r_los, mask_M    # return everything in degrees
+    return np.rad2deg(alpha_data), np.rad2deg(alpha_eq_data), lon_data, mask_M    # return everything in degrees
 
 
 def mask_M(Jn_SIII: TWO_D_NDArray, UGLI_M: UGLI, M: float) -> ONE_D_NDArray:
@@ -202,13 +228,14 @@ def main():
             boresight_SIII_2 = boresight_SIII_2[mask2, :]           # mask boresights
 
             print("Calculating intersections")
-            s = np.linspace(0, 7, 100)                              # LOS distance
             if 1 in chs:
-                alphas1, alphas_eq1, lons1, r_los1, r_los_mask1 = intersect_alphas_lons(r_sc=Jn_SIII_ch1, r_b=boresight_SIII_1, s=s,
+                r_los1 = r_los(r_sc=Jn_SIII_ch1, r_b=boresight_SIII_1, smin=0.2, smax=7, sN=100)
+                alphas1, alphas_eq1, lons1, r_los_mask1 = intersect_alphas_lons(r_los=r_los1, r_b=boresight_SIII_1,
                                                                          UGLI_M=UGLI_M, UGLI_B=UGLI_B, UGLI_Beq=UGLI_Beq, UGLI_lonxy=UGLI_lonxy,
                                                                          M=M, dM=0.05)
             if (len(chs) == 1 and chs[0] != 1) or len(chs) > 1:
-                alphas2, alphas_eq2, lons2, r_los2, r_los_mask2 = intersect_alphas_lons(r_sc=Jn_SIII_ch2, r_b=boresight_SIII_2, s=s,
+                r_los2 = r_los(r_sc=Jn_SIII_ch2, r_b=boresight_SIII_2, smin=0.2, smax=7, sN=100)
+                alphas2, alphas_eq2, lons2, r_los_mask2 = intersect_alphas_lons(r_los=r_los2, r_b=boresight_SIII_2,
                                                                          UGLI_M=UGLI_M, UGLI_B=UGLI_B, UGLI_Beq=UGLI_Beq, UGLI_lonxy=UGLI_lonxy,
                                                                          M=M, dM=0.05)
             print("Binning")
