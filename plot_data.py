@@ -13,8 +13,11 @@ from coordinates import get_PJ_time_ET
 # default
 import argparse
 from typing import Optional
+from pathlib import Path
 
 PJ_dspr = np.array([[1, 307]])
+IM_PATH = "images/banana"
+Path(IM_PATH).mkdir(parents=True, exist_ok=True)
 
 
 def fill_missing_data(data: pd.DataFrame) -> pd.DataFrame:
@@ -98,7 +101,7 @@ def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame, samples_
         add_contours(axes[i], int(ch[2]), GRDR_data_pj, samples_per_rot, num_spins, overlay_type)
         axes[i].set_title(ch)
     fig.tight_layout()
-    fig.savefig(f"MWR_banana_{params_str}_{overlay_type}.png", dpi=300)
+    fig.savefig(f"{IM_PATH}/MWR_banana_{params_str}_{overlay_type}.png", dpi=300)
 
 
 def add_contours(ax: Axes, ch: int, GRDR_data_pj: pd.DataFrame, samples_per_rot: int, num_spins: int, type: Optional[str]):
