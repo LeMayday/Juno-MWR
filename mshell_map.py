@@ -7,17 +7,14 @@ from scipy.ndimage import map_coordinates
 # local files
 from plot_data import make_subplots
 from PDS_helper import load_PJ_data, NoProductsError, FileDownloadError, DownloadShortCircuitError, BadPJError
-from synchrotron_map import parse_PJs, stack_data, RJ
 from coordinates import pos_to_angle
+from synchrotron_map import parse_PJs, stack_data
+from global_vars import RJ, ONE_D_NDArray, TWO_D_NDArray, THREE_D_NDArray, FOUR_D_NDArray, VMAX
 
 # default
 import argparse
 from pathlib import Path
 
-ONE_D_NDArray   = np.ndarray[tuple[int,], np.dtype[np.float32]]
-TWO_D_NDArray   = np.ndarray[tuple[int, int], np.dtype[np.float32]]
-THREE_D_NDArray = np.ndarray[tuple[int, int, int], np.dtype[np.float32]]
-FOUR_D_NDArray  = np.ndarray[tuple[int, int, int, int], np.dtype[np.float32]]
 COLS_GRDR = ['t_ephem_time', 't_utc_doy',
              'PC_lon_JsB1', 'PC_lon_JsB2',
              'S3RH_x_B1', 'S3RH_y_B1', 'S3RH_z_B1', 'S3RH_x_B2', 'S3RH_y_B2', 'S3RH_z_B2',
@@ -270,10 +267,9 @@ def main():
 
         np.save(f"npy/MWR_Ta_stacked_{params_str}.npy", stacked_Ta_data)
         np.save(f"npy/MWR_alpha_stacked_{params_str}.npy", stacked_alpha_data)
-        vmax = np.array([5000, 1100, 250, 70, 25, 15])[chs - 1]
 
         BLC_file = f"BLC_M{int(M)}.txt" if M in [2, 3, 5, 10] else None
-        plot_data(stacked_Ta_data, chs, f"Ta_series_{params_str}", vmax=vmax, BLC_file=BLC_file, save_path=save_path)
+        plot_data(stacked_Ta_data, chs, f"Ta_series_{params_str}", vmax=VMAX[chs - 1], BLC_file=BLC_file, save_path=save_path)
         plot_data(stacked_alpha_data, chs, f"alpha_series_{params_str}", save_path=save_path)
 
 

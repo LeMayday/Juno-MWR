@@ -3,8 +3,7 @@ import numpy as np
 import JupiterMag as jm
 
 # local files
-from synchrotron_map import RJ
-from mshell_map import THREE_D_NDArray, FOUR_D_NDArray
+from global_vars import RJ, THREE_D_NDArray, FOUR_D_NDArray
 
 # default
 import argparse

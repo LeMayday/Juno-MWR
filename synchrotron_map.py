@@ -8,11 +8,11 @@ import healpy as hp
 from plot_data import make_subplots
 from PDS_helper import load_PJ_data, NoProductsError, FileDownloadError, DownloadShortCircuitError
 from coordinates import lat_lonW, lat_lonE
+from global_vars import RJ
 
 # default
 import argparse
 
-RJ = 71492  # km
 # only the cols needed for the map
 COLS_GRDR_MAP = ['t_ephem_time', 't_utc_doy',
                  'JMag_x_B1', 'JMag_y_B1', 'JMag_z_B1', 'JMag_x_B2', 'JMag_y_B2', 'JMag_z_B2',
