@@ -1,5 +1,6 @@
 # modules
 import numpy as np
+from numpy.linalg import norm
 import matplotlib.pyplot as plt
 from scipy.stats import binned_statistic_2d
 from scipy.ndimage import map_coordinates
@@ -71,12 +72,12 @@ def alpha_eq(alpha: np.ndarray, Beq: np.ndarray, B: np.ndarray) -> np.ndarray:
     """
     alpha: array of local pitch angles
 
-    Beq: array of B vectors at magnetic equator mapped from positions
+    Beq: array of B magnitudes at magnetic equator mapped from positions
 
-    B: array of B vectors at positions
+    B: array of B magnitudes at positions
     """
     # sin^2(alpha) / B = sin^2(alpha_eq) / Beq => sin(alpha_eq) = sin(alpha) * sqrt(Beq / B)
-    return np.asin(np.sin(alpha) * np.sqrt(np.linalg.norm(Beq, axis=-1) / np.linalg.norm(B, axis=-1)))
+    return np.asin(np.sin(alpha) * np.sqrt(Beq / B))
 
 
 def r_los(r_sc: np.ndarray, r_b: np.ndarray, smin: float, smax: float, sN: int):
@@ -97,7 +98,7 @@ def intersect_alphas_lons(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray,
     alpha_los = alpha(r_b, B_los)
 
     Beq_los = UGLI_Beq(r_los)
-    alpha_eq_los = alpha_eq(alpha_los, Beq_los, B_los)
+    alpha_eq_los = alpha_eq(alpha_los, norm(Beq_los, axis=-1), norm(B_los, axis=-1))
 
     lonxy_los = UGLI_lonxy(r_los)                                                           # interpolate xy since these are continuous
     _, lon_los_rad = pos_to_angle(lonxy_los[..., 0], lonxy_los[..., 1], 0)
