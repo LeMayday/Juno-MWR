@@ -200,7 +200,7 @@ def main():
         series_Ta = np.full((len(chs), 90, 180, len(pjs)), np.nan)      # longitudes as cols for plotting; initialize as NaNs
         series_alpha = np.full_like(series_Ta, np.nan)
         skipped_PJs = []
-        for pj in pjs:
+        for i, pj in enumerate(pjs):
             print(f"Loading PJ {pj}")
             try:
                 IRDR_data_pj, GRDR_data_pj = load_PJ_data(pj, args.dt, chs, keep_cols_GRDR=COLS_GRDR)
@@ -249,9 +249,9 @@ def main():
                 assert Ta.shape == alphas_eq.shape == lons.shape, "Ta, alphas, and lons must have same shape!"
 
                 binned_Ta_medians = bin_data(Ta, lons, alphas_eq)   # this should drop values if lons or alphas_eq are nan
-                series_Ta[ch-1, :, :, pj-1] = binned_Ta_medians.T   # binned_statistic maps x to rows
+                series_Ta[ch-1, :, :, i] = binned_Ta_medians.T   # binned_statistic maps x to rows
                 binned_alpha_medians = bin_data(alphas, lons, alphas_eq)    # track which measurement comes from which local pitch angle
-                series_alpha[ch-1, :, :, pj-1] = binned_alpha_medians.T
+                series_alpha[ch-1, :, :, i] = binned_alpha_medians.T
         print(f"Data compilation finished. Skipped PJs: {skipped_PJs}")
 
         params_str = f"PJs{args.PJs}_CHs{args.ch}_M{M}_dt{args.dt}"
