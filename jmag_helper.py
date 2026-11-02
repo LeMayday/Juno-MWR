@@ -10,13 +10,13 @@ import argparse
 import concurrent.futures
 import os
 import sys
-from enum import Enum
+from enum import IntEnum
 
 MAX_WORKERS = max(1, os.cpu_count() - 2)
 RJ_polar_ratio = 66854 / RJ
 MAXLEN = 30000
 
-class IDX(Enum):
+class IDX(IntEnum):
     XEQ = 0     # equator x (SIII)
     YEQ = 1     # equator y (SIII)
     ZEQ = 2     # equator z (SIII)
