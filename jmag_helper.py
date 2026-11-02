@@ -151,7 +151,7 @@ def generate_Bfield_mesh(M_max: float, N: float, max_workers: int):
     dipole_xy[jupiter_mask, :] = np.nan
 
     np.savez(f"B-mesh_Mmax-{M_max}_N-{N}.npz", x_vec=x_vec, y_vec=y_vec, z_vec=z_vec,
-             B_mesh=B_mesh, B_mesh_eq=B_mesh_eq, Mshell=Mshell, dipole_xy=dipole_xy)  # all are float32
+             B_mesh=B_mesh, B_mesh_eq=B_mesh_eq, B_mesh_in=B_mesh_in, B_mesh_is=B_mesh_is, Mshell=Mshell, dipole_xy=dipole_xy)  # all are float32
 
 
 def test_chunking_and_recombining():
