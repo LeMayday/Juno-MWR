@@ -9,6 +9,7 @@ from unwrap import unwrap
 # local files
 from PDS_helper import COLS_GRDR, load_PJ_data, get_SIII_lat_lon, get_VIP4_lat_lon, get_PC_lat_lon
 from coordinates import get_PJ_time_ET
+from global_vars import VMAX
 
 # default
 import argparse
@@ -85,7 +86,7 @@ def time_series_plot(IRDR_data_pj: pd.DataFrame, pj: int):
     plt.show()
 
 
-def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame, samples_per_rot, params_str: str, overlay_type: Optional[str] = None):
+def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame, samples_per_rot, params_str: str, overlay_type: Optional[str] = None, vmax: list = None):
     IRDR_data_pj = fill_missing_data(IRDR_data_pj)
     GRDR_data_pj = fill_missing_data(GRDR_data_pj)
     fig = plt.figure(figsize=(12,8))
@@ -95,7 +96,10 @@ def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame, samples_
         num_spins = data.size // samples_per_rot
         data = data[:(num_spins * samples_per_rot)]     # need to truncate data to integer # of rotations
         data_folded = data.reshape(-1, samples_per_rot)
-        im = axes[i].imshow(data_folded, cmap='gist_ncar', aspect='auto', origin='lower')
+        if vmax is not None:
+            im = axes[i].imshow(data_folded, cmap='gist_ncar', aspect='auto', origin='lower', vmin=0, vmax=vmax[i])
+        else:
+            im = axes[i].imshow(data_folded, cmap='gist_ncar', aspect='auto', origin='lower')
         fig.colorbar(im, ax=axes[i])
         # note ch is "Ch{i}"
         add_contours(axes[i], int(ch[2]), GRDR_data_pj, samples_per_rot, num_spins, overlay_type)
