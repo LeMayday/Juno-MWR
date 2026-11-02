@@ -5,11 +5,11 @@ from scipy.special import kv
 import scipy.integrate as integrate
 
 
-def F_prim(x):
+def __F_prim(x):
     return x * integrate.quad(lambda y: kv(5/3, y), x, np.inf)[0]
 
 def F(x):
-    return np.vectorize(F_prim)(x)
+    return np.vectorize(__F_prim)(x)
 
 def F_p(x):
     return x * kv(2/3, x)
