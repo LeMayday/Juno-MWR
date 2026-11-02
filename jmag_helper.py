@@ -13,6 +13,7 @@ import sys
 
 MAX_WORKERS = max(1, os.cpu_count() - 2)
 RJ_polar_ratio = 66854 / RJ
+MAXLEN = 30000
 
 def init_jm_config():
     jm.Con2020.Config(equation_type='analytic')
@@ -41,8 +42,9 @@ def batch_equator(R: FOUR_D_NDArray) -> FOUR_D_NDArray:
     # r represents positions, with x,y,z, along last axis
     # B-field model only operates on inputs as 1D vectors. This ensures contiguous memory layout
     R_flat = np.ascontiguousarray(R.reshape(-1, 3), dtype=np.float32)
-    Teq = jm.TraceField(R_flat[:, 0], R_flat[:, 1], R_flat[:, 2], Verbose=False, IntModel='jrm33', ExtModel='Con2020',
-                        InitStep=0.005, MinStep=0.001, ErrMax=1e-10, MaxLen=20000, TraceDir='both',).equator
+    T = jm.TraceField(R_flat[:, 0], R_flat[:, 1], R_flat[:, 2], Verbose=False, IntModel='jrm33', ExtModel='Con2020',
+                      InitStep=0.01, MinStep=0.001, MaxStep=0.1, ErrMax=1e-7, MaxLen=MAXLEN, TraceDir='both')
+    Teq = T.equator
 
     out_flat = np.empty((R_flat.shape[0], 5), dtype=np.float32)     # out is size of R with x3, y3, z3, M, lon fields
     out_flat[:, 0] = Teq.x3
@@ -109,7 +111,7 @@ def generate_Bfield_mesh(M_max: float, N: float = 120):
 
     B_mesh = B(X, Y, Z)     # these positions are SIII!
 
-    num_bytes = (N+1) * (N+1) * (N*2//3 + 1) * 1000 * 8     # total size of X,Y,Z x 1000 pts per trace x 8 bytes per float64
+    num_bytes = (N+1) * (N+1) * (N*2//3 + 1) * MAXLEN * 8   # total size of X,Y,Z x 1000 pts per trace x 8 bytes per float64
     n_splits = int(np.ceil((num_bytes / 2E9)**(1/3)))       # aim for 2 GB: num_bytes / n_splits**3 ~= 2 GB
     n_splits *= 2                                           # be more conservative since extra memory could be used by TraceField object
     eq_data = tracefield_chunked(X, Y, Z, n_splits)         # these positions are SIII! --- eq_data is domain x (x3, y3, z3, M, lon) along last axis, lon in radians
