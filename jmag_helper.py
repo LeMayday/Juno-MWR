@@ -10,10 +10,25 @@ import argparse
 import concurrent.futures
 import os
 import sys
+from enum import Enum
 
 MAX_WORKERS = max(1, os.cpu_count() - 2)
 RJ_polar_ratio = 66854 / RJ
 MAXLEN = 30000
+
+class IDX(Enum):
+    XEQ = 0     # equator x (SIII)
+    YEQ = 1     # equator y (SIII)
+    ZEQ = 2     # equator z (SIII)
+    XIN = 3     # ionosphere north footprint x (SIII)
+    YIN = 4     # ionosphere north footprint y (SIII)
+    ZIN = 5     # ionosphere north footprint z (SIII)
+    XIS = 6     # ionosphere south footprint x (SIII)
+    YIS = 7     # ionosphere south footprint y (SIII)
+    ZIS = 8     # ionosphere south footprint z (SIII)
+    MSH = -2    # mshell
+    MLN = -1    # mlone
+
 
 def init_jm_config():
     jm.Con2020.Config(equation_type='analytic')
@@ -45,14 +60,21 @@ def batch_equator(R: FOUR_D_NDArray) -> FOUR_D_NDArray:
     T = jm.TraceField(R_flat[:, 0], R_flat[:, 1], R_flat[:, 2], Verbose=False, IntModel='jrm33', ExtModel='Con2020',
                       InitStep=0.01, MinStep=0.001, MaxStep=0.1, ErrMax=1e-7, MaxLen=MAXLEN, TraceDir='both')
     Teq = T.equator
+    Tion = T.ionosphere
 
-    out_flat = np.empty((R_flat.shape[0], 5), dtype=np.float32)     # out is size of R with x3, y3, z3, M, lon fields
-    out_flat[:, 0] = Teq.x3
-    out_flat[:, 1] = Teq.y3
-    out_flat[:, 2] = Teq.z3
-    out_flat[:, 3] = Teq.mshell
-    out_flat[:, 4] = np.mod(Teq.mlone, 2*np.pi)     # mlone returns lon in radians from [-pi, pi]. (lon + 2pi) % 2pi
-    return out_flat.reshape((*R.shape[:-1], 5))     # reshape back to original R shape
+    out_flat = np.empty((R_flat.shape[0], len(IDX)), dtype=np.float32)     # out is size of R with x3, y3, z3, M, lon fields
+    out_flat[:, IDX.XEQ] = Teq.x3
+    out_flat[:, IDX.YEQ] = Teq.y3
+    out_flat[:, IDX.ZEQ] = Teq.z3
+    out_flat[:, IDX.XIN] = Tion.xn3
+    out_flat[:, IDX.YIN] = Tion.yn3
+    out_flat[:, IDX.ZIN] = Tion.zn3
+    out_flat[:, IDX.XIS] = Tion.xs3
+    out_flat[:, IDX.YIS] = Tion.xs3
+    out_flat[:, IDX.ZIS] = Tion.xs3
+    out_flat[:, IDX.MSH] = Teq.mshell
+    out_flat[:, IDX.MLN] = np.mod(Teq.mlone, 2*np.pi)     # mlone returns lon in radians from [-pi, pi]. (lon + 2pi) % 2pi
+    return out_flat.reshape((*R.shape[:-1], len(IDX)))    # reshape back to original R shape
 
 
 def chunk_and_flatten_3D(X: THREE_D_NDArray, Y: THREE_D_NDArray, Z: THREE_D_NDArray, n_splits: int) -> list[FOUR_D_NDArray]:
@@ -114,10 +136,12 @@ def generate_Bfield_mesh(M_max: float, N: float, max_workers: int):
     num_bytes = (N+1) * (N+1) * (N*2//3 + 1) * MAXLEN * 8   # total size of X,Y,Z x 1000 pts per trace x 8 bytes per float64
     n_splits = int(np.ceil((num_bytes / 2E9)**(1/3)))       # aim for 2 GB: num_bytes / n_splits**3 ~= 2 GB
     n_splits *= 2                                           # be more conservative since extra memory could be used by TraceField object
-    eq_data = tracefield_chunked(X, Y, Z, n_splits, max_workers)    # these positions are SIII! --- eq_data is domain x (x3, y3, z3, M, lon) along last axis, lon in radians
-    B_mesh_eq = B(eq_data[..., 0], eq_data[..., 1], eq_data[..., 2])
-    Mshell = eq_data[..., -2]
-    dipole_lon = eq_data[..., -1]
+    footprint_data = tracefield_chunked(X, Y, Z, n_splits, max_workers)    # these positions are SIII! --- eq_data is domain x (x3, y3, z3, M, lon) along last axis, lon in radians
+    B_mesh_eq = B(footprint_data[..., IDX.XEQ], footprint_data[..., IDX.YEQ], footprint_data[..., IDX.ZEQ])
+    B_mesh_in = B(footprint_data[..., IDX.XIN], footprint_data[..., IDX.YIN], footprint_data[..., IDX.ZIN])
+    B_mesh_is = B(footprint_data[..., IDX.XIS], footprint_data[..., IDX.YIS], footprint_data[..., IDX.ZIS])
+    Mshell = footprint_data[..., IDX.MSH]
+    dipole_lon = footprint_data[..., IDX.MLN]
     dipole_xy = np.stack((np.cos(dipole_lon), np.sin(dipole_lon)), axis=-1)     # dipole_lon is dicontinuous and not interpolatable
 
     jupiter_mask = X**2 + Y**2 + (Z / RJ_polar_ratio)**2 < 1
