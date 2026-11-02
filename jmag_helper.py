@@ -85,7 +85,7 @@ def recombine_chunked_data(flat_results: list[FOUR_D_NDArray], n_splits: int) ->
     return np.concatenate(list_of_xs, axis=0)                                                           # combine across x
 
 
-def tracefield_chunked(X: THREE_D_NDArray, Y: THREE_D_NDArray, Z: THREE_D_NDArray, n_splits: int) -> FOUR_D_NDArray:
+def tracefield_chunked(X: THREE_D_NDArray, Y: THREE_D_NDArray, Z: THREE_D_NDArray, n_splits: int, max_workers: int) -> FOUR_D_NDArray:
     """
     Splits 3D coordinate grids (X, Y, Z) into n_splits along each axis, evaluates
     TraceField on each chunk, and concatenates the resulting .equator fields.
@@ -97,13 +97,13 @@ def tracefield_chunked(X: THREE_D_NDArray, Y: THREE_D_NDArray, Z: THREE_D_NDArra
     # for i, chunk in enumerate(flat_chunks):
     #     flat_results.append(batch_equator(chunk))
 
-    with concurrent.futures.ProcessPoolExecutor(max_workers=12, initializer=init_jm_config) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers, initializer=init_jm_config) as executor:
         flat_results = list(executor.map(batch_equator, flat_chunks))
 
     return recombine_chunked_data(flat_results, n_splits)
 
 
-def generate_Bfield_mesh(M_max: float, N: float = 120):
+def generate_Bfield_mesh(M_max: float, N: float, max_workers: int):
     x_vec = np.linspace(-M_max, M_max, N+1)
     y_vec = np.linspace(-M_max, M_max, N+1)
     z_vec = np.linspace(-M_max*2/3, M_max*2/3, N*2//3 + 1)
@@ -114,7 +114,7 @@ def generate_Bfield_mesh(M_max: float, N: float = 120):
     num_bytes = (N+1) * (N+1) * (N*2//3 + 1) * MAXLEN * 8   # total size of X,Y,Z x 1000 pts per trace x 8 bytes per float64
     n_splits = int(np.ceil((num_bytes / 2E9)**(1/3)))       # aim for 2 GB: num_bytes / n_splits**3 ~= 2 GB
     n_splits *= 2                                           # be more conservative since extra memory could be used by TraceField object
-    eq_data = tracefield_chunked(X, Y, Z, n_splits)         # these positions are SIII! --- eq_data is domain x (x3, y3, z3, M, lon) along last axis, lon in radians
+    eq_data = tracefield_chunked(X, Y, Z, n_splits, max_workers)    # these positions are SIII! --- eq_data is domain x (x3, y3, z3, M, lon) along last axis, lon in radians
     B_mesh_eq = B(eq_data[..., 0], eq_data[..., 1], eq_data[..., 2])
     Mshell = eq_data[..., -2]
     dipole_lon = eq_data[..., -1]
@@ -173,8 +173,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--Mmax", required=True, type=float, help="Max RJ distance of mesh")
     parser.add_argument('-N', "--N", required=False, default=120, type=int, help="Number of mesh intervals in x and y dimensions")
+    parser.add_argument('-w', "--max-workers", required=False, default=MAX_WORKERS, type=int, help="Maximum number of CPU workers to use")
     args = parser.parse_args()
-    generate_Bfield_mesh(args.Mmax, args.N)
+    generate_Bfield_mesh(args.Mmax, args.N, args.max_workers)
 
 
 if __name__ == "__main__":
