@@ -6,7 +6,7 @@ from scipy.stats import binned_statistic_2d
 from scipy.ndimage import map_coordinates
 
 # local files
-from plot_data import make_subplots
+from banana_slug import make_subplots
 from PDS_helper import load_PJ_data, NoProductsError, FileDownloadError, DownloadShortCircuitError, BadPJError
 from coordinates import pos_to_angle
 from synchrotron_map import parse_PJs, stack_data

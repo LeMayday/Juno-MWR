@@ -5,7 +5,7 @@ from scipy.stats import binned_statistic
 import healpy as hp
 
 # local files
-from plot_data import make_subplots
+from banana_slug import make_subplots
 from PDS_helper import load_PJ_data, NoProductsError, FileDownloadError, DownloadShortCircuitError
 from coordinates import lat_lonW, lat_lonE
 from global_vars import RJ
