@@ -37,7 +37,7 @@ def lat_lonE(x: np.ndarray, y: np.ndarray, z: np.ndarray) -> tuple[np.ndarray, n
     # longitude increasing to the east
     theta, phi = pos_to_angle(x, y, z)
     lat = 90 - np.rad2deg(theta)
-    lon = np.rad2deg(phi)
+    lon = np.rad2deg(phi) % 360
     return lat, lon
 
 

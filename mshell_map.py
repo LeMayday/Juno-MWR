@@ -8,8 +8,8 @@ from scipy.ndimage import map_coordinates
 # local files
 from banana_slug import make_subplots
 from PDS_helper import load_PJ_data, NoProductsError, FileDownloadError, DownloadShortCircuitError, BadPJError
-from coordinates import pos_to_angle
 from synchrotron_map import parse_PJs, stack_data
+from coordinates import lat_lonE
 from global_vars import RJ, ONE_D_NDArray, TWO_D_NDArray, THREE_D_NDArray, FOUR_D_NDArray, VMAX
 
 # default
@@ -100,9 +100,8 @@ def intersect_alphas_lons(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray,
     Beq_los = UGLI_Beq(r_los)
     alpha_eq_los = alpha_eq(alpha_los, norm(Beq_los, axis=-1), norm(B_los, axis=-1))
 
-    lonxy_los = UGLI_lonxy(r_los)                                                           # interpolate xy since these are continuous
-    _, lon_los_rad = pos_to_angle(lonxy_los[..., 0], lonxy_los[..., 1], 0)
-    lon_los = np.rad2deg(np.mod(lon_los_rad, 2*np.pi))   # convert xy to longitude
+    lonxy_los = UGLI_lonxy(r_los)                               # interpolate xy since these are continuous
+    _, lon_los = lat_lonE(lonxy_los[..., 0], lonxy_los[..., 1], 0)
 
     # filter regions outside Mshell
     alpha_los[~mask_M] = np.nan
