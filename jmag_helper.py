@@ -26,8 +26,9 @@ class IDX(IntEnum):
     XIS = 6     # ionosphere south footprint x (SIII)
     YIS = 7     # ionosphere south footprint y (SIII)
     ZIS = 8     # ionosphere south footprint z (SIII)
-    MSH = -2    # mshell
-    MLN = -1    # mlone
+    MSH = -1    # mshell
+    XEM = -2    # equator x (MAG) --- there is a bug in JupiterMag for calculating mlone
+    YEM = -3    # equator y (MAG)
 
 
 def init_jm_config():
@@ -73,7 +74,8 @@ def batch_equator(R: FOUR_D_NDArray) -> FOUR_D_NDArray:
     out_flat[:, IDX.YIS] = Tion.xs3
     out_flat[:, IDX.ZIS] = Tion.xs3
     out_flat[:, IDX.MSH] = Teq.mshell
-    out_flat[:, IDX.MLN] = np.mod(Teq.mlone, 2*np.pi)     # mlone returns lon in radians from [-pi, pi]. (lon + 2pi) % 2pi
+    out_flat[:, IDX.XEM] = Teq.xm
+    out_flat[:, IDX.YEM] = Teq.ym
     return out_flat.reshape((*R.shape[:-1], len(IDX)))    # reshape back to original R shape
 
 
@@ -141,8 +143,7 @@ def generate_Bfield_mesh(M_max: float, N: float, max_workers: int):
     B_mesh_in = B(footprint_data[..., IDX.XIN], footprint_data[..., IDX.YIN], footprint_data[..., IDX.ZIN])
     B_mesh_is = B(footprint_data[..., IDX.XIS], footprint_data[..., IDX.YIS], footprint_data[..., IDX.ZIS])
     Mshell = footprint_data[..., IDX.MSH]
-    dipole_lon = footprint_data[..., IDX.MLN]
-    dipole_xy = np.stack((np.cos(dipole_lon), np.sin(dipole_lon)), axis=-1)     # dipole_lon is dicontinuous and not interpolatable
+    dipole_xy = np.stack((footprint_data[..., IDX.XEM], footprint_data[..., IDX.YEM]), axis=-1)     # dipole_lon is dicontinuous and not interpolatable
 
     jupiter_mask = X**2 + Y**2 + (Z / RJ_polar_ratio)**2 < 1
     B_mesh[jupiter_mask, :] = np.nan
@@ -179,11 +180,11 @@ def test_Bfield_trace_chunking():
     X, Y, Z = np.meshgrid(x_vec, y_vec, z_vec, indexing='ij')
     n_splits = 2
     eq_data = tracefield_chunked(X, Y, Z, n_splits)
-    Mshell_chunked = eq_data[..., -2]
+    Mshell_chunked = eq_data[..., IDX.MSH]
     Mshell_chunked[Mshell_chunked < 0.5] = np.nan
     Mshell_chunked = np.nan_to_num(Mshell_chunked)
     R = np.stack((X, Y, Z), axis=-1)
-    Mshell_not_chunked = batch_equator(R)[..., -2]
+    Mshell_not_chunked = batch_equator(R)[..., IDX.MSH]
     Mshell_not_chunked[Mshell_not_chunked < 0.5] = np.nan
     Mshell_not_chunked = np.nan_to_num(Mshell_not_chunked)
     assert np.count_nonzero(~np.isclose(Mshell_chunked, Mshell_not_chunked)) == 0
