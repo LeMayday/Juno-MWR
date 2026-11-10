@@ -73,11 +73,11 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, da: float, R_sync: fl
         except (NoProductsError, FileDownloadError, DownloadShortCircuitError) as err:
             continue
         # grab relevant columns
-        boresight_SIII_1 = GRDR_data_pj[[f'{col_prefix}_x_B1', f'{col_prefix}_y_B1', f'{col_prefix}_z_B1']].to_numpy()  # normalized
-        boresight_SIII_2 = GRDR_data_pj[[f'{col_prefix}_x_B2', f'{col_prefix}_y_B2', f'{col_prefix}_z_B2']].to_numpy()  # normalized
         Jn_SIII = get_Juno_pos_RJ(GRDR_data_pj=GRDR_data_pj, col_prefix=col_prefix)
         Jn_range_RJ = np.linalg.norm(Jn_SIII, axis=1)
         Jn_SIII_norm = Jn_SIII / np.expand_dims(Jn_range_RJ, axis=1)                                    # normalized
+        boresight_SIII_1 = get_boresight_dir(GRDR_data_pj=GRDR_data_pj, CH=1, col_prefix=col_prefix)    # normalized
+        boresight_SIII_2 = get_boresight_dir(GRDR_data_pj=GRDR_data_pj, CH=2, col_prefix=col_prefix)    # normalized
         # filter by range
         range_mask = Jn_range_RJ < R_sync
         # filter by angle condition -- masks should have same size as original dataframe
