@@ -73,27 +73,27 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, da: float, R_sync: fl
         except (NoProductsError, FileDownloadError, DownloadShortCircuitError) as err:
             continue
         # grab relevant columns
-        Jn_SIII = GRDR_data_pj[[f'{col_prefix}_x_JcJn', f'{col_prefix}_y_JcJn', f'{col_prefix}_z_JcJn']].to_numpy()     # apparently this is not normalized
-        Jn_range = np.linalg.norm(Jn_SIII, axis=1)                                         
-        Jn_SIII_norm = Jn_SIII / np.expand_dims(Jn_range, axis=1)                                                       # normalized
         boresight_SIII_1 = GRDR_data_pj[[f'{col_prefix}_x_B1', f'{col_prefix}_y_B1', f'{col_prefix}_z_B1']].to_numpy()  # normalized
         boresight_SIII_2 = GRDR_data_pj[[f'{col_prefix}_x_B2', f'{col_prefix}_y_B2', f'{col_prefix}_z_B2']].to_numpy()  # normalized
+        Jn_SIII = get_Juno_pos_RJ(GRDR_data_pj=GRDR_data_pj, col_prefix=col_prefix)
+        Jn_range_RJ = np.linalg.norm(Jn_SIII, axis=1)
+        Jn_SIII_norm = Jn_SIII / np.expand_dims(Jn_range_RJ, axis=1)                                    # normalized
         # filter by range
-        range_mask = Jn_range < R_sync * RJ
+        range_mask = Jn_range_RJ < R_sync
         # filter by angle condition -- masks should have same size as original dataframe
         angle_mask_1 = np.einsum('ij,ij->i', Jn_SIII_norm, boresight_SIII_1) > np.cos(np.deg2rad(da))
         angle_mask_2 = np.einsum('ij,ij->i', Jn_SIII_norm, boresight_SIII_2) > np.cos(np.deg2rad(da))
         mask1 = np.logical_and(range_mask, angle_mask_1)
         mask2 = np.logical_and(range_mask, angle_mask_2)
         # now compute true lat/lon
-        b_scale = R_sync - np.expand_dims(Jn_range, axis=1) / RJ                                # units of Rj
+        b_scale = R_sync - np.expand_dims(Jn_range_RJ, axis=1)                                  # units of Rj
         for j, ch in enumerate(chs):
             T_a = IRDR_data_pj[f"Ch{ch}"]   # antenna temperature
             if ch == 1:
-                s = Jn_SIII[mask1] / RJ + boresight_SIII_1[mask1] * b_scale[mask1]              # units of Rj
+                s = Jn_SIII[mask1] + boresight_SIII_1[mask1] * b_scale[mask1]                   # units of Rj
                 T_a = T_a[mask1]
             else:
-                s = Jn_SIII[mask2] / RJ + boresight_SIII_2[mask2] * b_scale[mask2]              # units of Rj
+                s = Jn_SIII[mask2] + boresight_SIII_2[mask2] * b_scale[mask2]                   # units of Rj
                 T_a = T_a[mask2]
             s = s / np.expand_dims(np.linalg.norm(s, axis=1), axis=1)                           # normalized
             s_x, s_y, s_z = np.hsplit(s, 3)
