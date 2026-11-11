@@ -149,6 +149,13 @@ def mask_jupiter(jupiter_intersections: ONE_D_NDArray) -> ONE_D_NDArray:
     return jupiter_mask
 
 
+def mask_lat(Jn_SIII: TWO_D_NDArray) -> ONE_D_NDArray:
+    Jn_SIII_norm = Jn_SIII / norm(Jn_SIII, axis=-1, keepdims=True)
+    lat, _ = lat_lonE(*Jn_SIII_norm.T)
+    lat_mask = np.logical_and(lat > -20, lat < 20)
+    return lat_mask
+
+
 def bin_data(values: ONE_D_NDArray, lons: ONE_D_NDArray, alphas: ONE_D_NDArray) -> TWO_D_NDArray:
     # longitudes in degrees!
     lon_bins = np.linspace(0, 360, 181, endpoint=True)
