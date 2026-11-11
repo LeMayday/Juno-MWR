@@ -4,10 +4,11 @@ from numpy.linalg import norm
 import matplotlib.pyplot as plt
 from scipy.stats import binned_statistic_2d
 from scipy.ndimage import map_coordinates
+from pandas import DataFrame
 
 # local files
 from banana_slug import make_subplots
-from PDS_helper import load_PJ_data, PDSError
+from PDS_helper import load_PJ_data, get_Juno_pos_RJ, get_boresight_dir, PDSError
 from synchrotron_map import parse_PJs, stack_data
 from coordinates import lat_lonE
 from global_vars import RJ, ONE_D_NDArray, TWO_D_NDArray, THREE_D_NDArray, FOUR_D_NDArray, VMAX
@@ -15,6 +16,7 @@ from global_vars import RJ, ONE_D_NDArray, TWO_D_NDArray, THREE_D_NDArray, FOUR_
 # default
 import argparse
 from pathlib import Path
+from typing import Literal
 
 COLS_GRDR = ['t_ephem_time', 't_utc_doy',
              'PC_lon_JsB1', 'PC_lon_JsB2',
@@ -191,6 +193,56 @@ def plot_data(data: THREE_D_NDArray, chs: list, params_str: str, vmax: list = No
     fig.tight_layout()
     fig.savefig(f"{save_path}/MWR_{params_str}.png", dpi=300)
     plt.close(fig)
+
+
+def geometry_mask(GRDR_data_pj: DataFrame, UGLI_M: UGLI, M: float, CH: Literal[1, 2]) -> ONE_D_NDArray:
+    Jn_SIII = get_Juno_pos_RJ(GRDR_data_pj)
+    lat_mask = mask_lat(Jn_SIII)                    # mask for near the equator
+    pos_mask = mask_M(Jn_SIII, UGLI_M, M)           # mask for within mshell
+    pos_mask = np.logical_and(pos_mask, lat_mask)
+    jupiter_mask = mask_jupiter(GRDR_data_pj[f"PC_lon_JsB{CH}"].to_numpy())     # mask where looking at jupiter
+    return np.logical_and(~jupiter_mask, pos_mask)
+
+
+def geometry_intersections(GRDR_data_pj: DataFrame, mask: ONE_D_NDArray, M: float, CH: Literal[1, 2],
+                           MI: MeshInterpolator, save_params: str = None) -> tuple[ONE_D_NDArray, ONE_D_NDArray, ONE_D_NDArray]:
+    # grab relevant columns
+    Jn_SIII = get_Juno_pos_RJ(GRDR_data_pj)
+    boresight_SIII = get_boresight_dir(GRDR_data_pj=GRDR_data_pj, CH=CH)
+    Jn_SIII = Jn_SIII[mask, :]                      # mask positions
+    boresight_SIII = boresight_SIII[mask, :]        # mask boresights
+
+    r_los = make_Rlos(r_sc=Jn_SIII, r_b=boresight_SIII, smin=0.2, smax=7, sN=100)
+    alphas, alphas_eq, lons, r_los_mask = intersect_alphas_lons(r_los=r_los, r_b=boresight_SIII, MI=MI, M=M, dM=0.05)
+    if save_params is not None:
+        np.savez(f"npz/MWR_plottables_{save_params}.npz", r_sc=Jn_SIII, r_b=boresight_SIII, r_los=r_los, r_los_mask=r_los_mask)
+    return alphas, alphas_eq, lons
+
+
+def map_Ta_to_M(IRDR_data_pj: DataFrame, GRDR_data_pj: DataFrame, M: float, pj: int,
+                MI: MeshInterpolator, num_lons: int = 180, num_alphas: int = 90) -> tuple[THREE_D_NDArray, THREE_D_NDArray]:
+    print("Calculating intersections")
+    mask1 = geometry_mask(GRDR_data_pj=GRDR_data_pj, UGLI_M=MI.M, M=M, CH=1)
+    mask2 = geometry_mask(GRDR_data_pj=GRDR_data_pj, UGLI_M=MI.M, M=M, CH=2)
+    alphas1, alphas_eq1, lons1 = geometry_intersections(GRDR_data_pj=GRDR_data_pj, mask=mask1, M=M, CH=1, MI=MI, save_params=f"M{M}_PJ{pj}_CH{1}")
+    alphas2, alphas_eq2, lons2 = geometry_intersections(GRDR_data_pj=GRDR_data_pj, mask=mask2, M=M, CH=2, MI=MI, save_params=f"M{M}_PJ{pj}_CH{1}")
+    out_Ta = np.full((6, num_alphas, num_lons), np.nan)
+    out_alpha = np.full_like(out_Ta, np.nan)
+    for ch in range(1, 7):
+        Ta = IRDR_data_pj[f"Ch{ch}"]    # antenna temperature
+        if ch == 1:
+            alphas, alphas_eq, lons = alphas1, alphas_eq1, lons1
+            Ta = Ta[mask1]
+        else:   # I do filtering outside of this loop so I don't redo work for each ch > 1
+            alphas, alphas_eq, lons = alphas2, alphas_eq2, lons2
+            Ta = Ta[mask2]
+        assert Ta.shape == alphas_eq.shape == lons.shape, "Ta, alphas, and lons must have same shape!"
+
+        binned_Ta_medians = bin_data(Ta, lons, alphas_eq, num_lons, num_alphas)             # this should drop values if lons or alphas_eq are nan
+        binned_alpha_medians = bin_data(alphas, lons, alphas_eq, num_lons, num_alphas)      # track which measurement comes from which local pitch angle
+        out_Ta[ch-1, :, :] = binned_Ta_medians.T                                            # binned_statistic maps x to rows, need x as cols for imshow
+        out_alpha[ch-1 :, :] = binned_alpha_medians.T
+    return out_Ta, out_alpha
 
 
 def main():
