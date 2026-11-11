@@ -156,10 +156,10 @@ def mask_lat(Jn_SIII: TWO_D_NDArray) -> ONE_D_NDArray:
     return lat_mask
 
 
-def bin_data(values: ONE_D_NDArray, lons: ONE_D_NDArray, alphas: ONE_D_NDArray) -> TWO_D_NDArray:
+def bin_data(values: ONE_D_NDArray, lons: ONE_D_NDArray, alphas: ONE_D_NDArray, num_lons: int = 180, num_alphas: int = 90) -> TWO_D_NDArray:
     # longitudes in degrees!
-    lon_bins = np.linspace(0, 360, 181, endpoint=True)
-    alpha_bins = np.linspace(0, 90, 91, endpoint=True)
+    lon_bins = np.linspace(0, 360, num_lons + 1, endpoint=True)
+    alpha_bins = np.linspace(0, 90, num_alphas + 1, endpoint=True)
     bad_input = np.logical_or(np.isnan(lons), np.isnan(alphas))
     values = values[~bad_input]
     lons = lons[~bad_input]
