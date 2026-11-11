@@ -57,6 +57,29 @@ class UniformGridLinearInterpolator:
 UGLI = UniformGridLinearInterpolator  # type alias
 
 
+class MeshInterpolator:
+    def __init__(self, mesh_file: str):
+        # construct RegularGridInterpolators for each mesh value
+        mesh_data = np.load(mesh_file)
+        x_vec = mesh_data["x_vec"]
+        y_vec = mesh_data["y_vec"]
+        z_vec = mesh_data["z_vec"]
+        points = (x_vec, y_vec, z_vec)
+        self.B     = UGLI(points=points, values=mesh_data["B_mesh"])
+        self.Beq   = UGLI(points=points, values=mesh_data["B_mesh_eq"])
+        self.M     = UGLI(points=points, values=mesh_data["Mshell"])
+        self.__lonxy = UGLI(points=points, values=mesh_data["dipole_xy"])
+
+    def lonxy(self, xi):
+        """
+        Interpolate magnetic longitudes.
+        """
+        interp_lonxy = self.__lonxy(xi)     # interpolate xy since these are continuous
+        _, interp_lon = lat_lonE(interp_lonxy[..., 0], interp_lonxy[..., 1], 0)
+        return interp_lon
+
+
+
 def alpha(r_b: np.ndarray, B: np.ndarray) -> np.ndarray:
     """
     r_b: array of boresight vectors
@@ -80,28 +103,25 @@ def alpha_eq(alpha: np.ndarray, Beq: np.ndarray, B: np.ndarray) -> np.ndarray:
     return np.asin(np.sin(alpha) * np.sqrt(Beq / B))
 
 
-def r_los(r_sc: np.ndarray, r_b: np.ndarray, smin: float, smax: float, sN: int):
+def make_Rlos(r_sc: np.ndarray, r_b: np.ndarray, smin: float, smax: float, sN: int):
     # r_sc is vector of normalized S/C pos vectors in SIII
     s = np.linspace(smin, smax, sN + 1)                 # LOS distance
     s_los = r_b[:, None, :] * s[None, :, None]          # num samples x num LOS pts x 3
     return r_sc[:, None, :] + s_los                     # add spacecraft positions to LOS points
 
 
-def intersect_alphas_lons(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray,
-                          UGLI_M: UGLI, UGLI_B: UGLI, UGLI_Beq: UGLI, UGLI_lonxy: UGLI,
-                          M: float, dM: float) -> tuple[ONE_D_NDArray, ONE_D_NDArray, ONE_D_NDArray, TWO_D_NDArray]:
+def intersect_alphas_lons(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray, MI: MeshInterpolator, M: float, dM: float) -> tuple[ONE_D_NDArray, ONE_D_NDArray, ONE_D_NDArray, TWO_D_NDArray]:
     # r_los is position at each sample time and at each point along LOS (num samples x num LOS pts x 3)
     # r_b is vector of normalized boresight vectors in SIII
-    M_los = UGLI_M(r_los)                                       # num samples x num LOS pts
+    M_los = MI.M(r_los)                                         # num samples x num LOS pts
     mask_M = np.logical_and(M_los > M - dM, M_los < M + dM)     # where the LOS is looking at the desired M-shell
-    B_los = UGLI_B(r_los)                                       # num samples x num LOS pts x 3
+    B_los = MI.B(r_los)                                         # num samples x num LOS pts x 3
     alpha_los = alpha(r_b, B_los)
 
-    Beq_los = UGLI_Beq(r_los)
+    Beq_los = MI.Beq(r_los)
     alpha_eq_los = alpha_eq(alpha_los, norm(Beq_los, axis=-1), norm(B_los, axis=-1))
 
-    lonxy_los = UGLI_lonxy(r_los)                               # interpolate xy since these are continuous
-    _, lon_los = lat_lonE(lonxy_los[..., 0], lonxy_los[..., 1], 0)
+    lon_los = MI.lonxy(r_los)
 
     # filter regions outside Mshell
     alpha_los[~mask_M] = np.nan
