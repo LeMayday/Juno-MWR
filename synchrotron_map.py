@@ -3,17 +3,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import binned_statistic
 import healpy as hp
-from pandas import DataFrame
 
 # local files
 from banana_slug import make_subplots
-from PDS_helper import load_PJ_data, PDSError
+from PDS_helper import load_PJ_data, get_Juno_pos_RJ, get_boresight_dir, PDSError
 from coordinates import lat_lonW, lat_lonE
-from global_vars import RJ, ONE_D_NDArray, TWO_D_NDArray
 
 # default
 import argparse
-from typing import Literal
 
 # only the cols needed for the map
 COLS_GRDR_MAP = ['t_ephem_time', 't_utc_doy',
@@ -32,27 +29,6 @@ def parse_PJs(PJ_str: str) -> list[int]:
         else:
             res.append(int(PJ_range))
     return res
-
-
-def get_Juno_pos(GRDR_data_pj: DataFrame, col_prefix = "S3RH") -> ONE_D_NDArray:
-    """
-    Returns Juno position in km.
-    """
-    return GRDR_data_pj[[f'{col_prefix}_x_JcJn', f'{col_prefix}_y_JcJn', f'{col_prefix}_z_JcJn']].to_numpy(dtype=np.float32)
-
-
-def get_Juno_pos_RJ(GRDR_data_pj: DataFrame, col_prefix = "S3RH") -> ONE_D_NDArray:
-    """
-    Returns Juno position in units of RJ.
-    """
-    return get_Juno_pos(GRDR_data_pj, col_prefix) / RJ
-
-
-def get_boresight_dir(GRDR_data_pj: DataFrame, CH: Literal[1, 2], col_prefix = "S3RH") -> TWO_D_NDArray:
-    """
-    Returns normalized boresight x,y,z, components.
-    """
-    return GRDR_data_pj[[f'{col_prefix}_x_B{CH}', f'{col_prefix}_y_B{CH}', f'{col_prefix}_z_B{CH}']].to_numpy()
 
 
 def compile_data(pjs: list[int], dt: int, chs: np.ndarray, da: float, R_sync: float, type: str, nside: int = 128) -> np.ndarray:

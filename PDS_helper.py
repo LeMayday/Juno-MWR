@@ -8,10 +8,12 @@ import requests
 
 # local files
 from coordinates import get_tmin_tmax, lat_lonE, lat_lonW, lat_lon_to_pos
+from global_vars import RJ, ONE_D_NDArray, TWO_D_NDArray
 
 # default
 from datetime import datetime
 import os
+from typing import Literal
 
 
 DATA_DIR = os.path.join('.', 'data')
@@ -225,3 +227,24 @@ def get_PC_lat_lon(GRDR_data_pj: pd.DataFrame, ch: int) -> tuple[np.ndarray, np.
     columns_to_select = [f'PC_x_JsB{ch}', f'PC_y_JsB{ch}', f'PC_z_JsB{ch}']
     data_x, data_y, data_z = np.hsplit(GRDR_data_pj[columns_to_select].to_numpy(), 3)
     return lat_lonE(data_x, data_y, data_z)
+
+
+def get_Juno_pos(GRDR_data_pj: pd.DataFrame, col_prefix = "S3RH") -> ONE_D_NDArray:
+    """
+    Returns Juno position in km.
+    """
+    return GRDR_data_pj[[f'{col_prefix}_x_JcJn', f'{col_prefix}_y_JcJn', f'{col_prefix}_z_JcJn']].to_numpy(dtype=np.float32)
+
+
+def get_Juno_pos_RJ(GRDR_data_pj: pd.DataFrame, col_prefix = "S3RH") -> ONE_D_NDArray:
+    """
+    Returns Juno position in units of RJ.
+    """
+    return get_Juno_pos(GRDR_data_pj, col_prefix) / RJ
+
+
+def get_boresight_dir(GRDR_data_pj: pd.DataFrame, CH: Literal[1, 2], col_prefix = "S3RH") -> TWO_D_NDArray:
+    """
+    Returns normalized boresight x,y,z, components.
+    """
+    return GRDR_data_pj[[f'{col_prefix}_x_B{CH}', f'{col_prefix}_y_B{CH}', f'{col_prefix}_z_B{CH}']].to_numpy()
