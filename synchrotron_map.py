@@ -7,7 +7,7 @@ from pandas import DataFrame
 
 # local files
 from banana_slug import make_subplots
-from PDS_helper import load_PJ_data, NoProductsError, FileDownloadError, DownloadShortCircuitError
+from PDS_helper import load_PJ_data, PDSError
 from coordinates import lat_lonW, lat_lonE
 from global_vars import RJ, ONE_D_NDArray, TWO_D_NDArray
 
@@ -70,7 +70,7 @@ def compile_data(pjs: list[int], dt: int, chs: np.ndarray, da: float, R_sync: fl
     for i, pj in enumerate(pjs):
         try:
             IRDR_data_pj, GRDR_data_pj = load_PJ_data(pj, dt, chs, keep_cols_GRDR=COLS_GRDR_MAP)
-        except (NoProductsError, FileDownloadError, DownloadShortCircuitError) as err:
+        except PDSError:
             continue
         # grab relevant columns
         Jn_SIII = get_Juno_pos_RJ(GRDR_data_pj=GRDR_data_pj, col_prefix=col_prefix)

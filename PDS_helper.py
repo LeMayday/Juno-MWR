@@ -30,23 +30,28 @@ COLS_GRDR = ['t_ephem_time', 't_utc_doy',
 BAD_PJS = [2, 55, 58, 62, 63, 64, 65, 68, 70, 71, 72, 73, 74, 75, 76, 77]
 
 
-class NoProductsError(Exception):
+class PDSError(Exception):
+    # parents class for all PDS related errors
+    pass
+
+
+class NoProductsError(PDSError):
     # Raised when PDS does not return any products for query
     # e.g. there is no data on PDS for PJ2 (2016-293T18:10:53)
     pass
 
 
-class FileDownloadError(Exception):
+class FileDownloadError(PDSError):
     # Raised when requests fails to download all of the files, even if PDS returns products
     pass
 
 
-class DownloadShortCircuitError(Exception):
+class DownloadShortCircuitError(PDSError):
     # Raised when code attempts to pull files from existing directory but finds none
     pass
 
 
-class BadPJError(Exception):
+class BadPJError(PDSError):
     # Raised when code attempts to pull files for a perijove that is known to cause problems
     pass
 

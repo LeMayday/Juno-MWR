@@ -7,7 +7,7 @@ from scipy.ndimage import map_coordinates
 
 # local files
 from banana_slug import make_subplots
-from PDS_helper import load_PJ_data, NoProductsError, FileDownloadError, DownloadShortCircuitError, BadPJError
+from PDS_helper import load_PJ_data, PDSError
 from synchrotron_map import parse_PJs, stack_data
 from coordinates import lat_lonE
 from global_vars import RJ, ONE_D_NDArray, TWO_D_NDArray, THREE_D_NDArray, FOUR_D_NDArray, VMAX
@@ -204,7 +204,7 @@ def main():
             print(f"Loading PJ {pj}")
             try:
                 IRDR_data_pj, GRDR_data_pj = load_PJ_data(pj, args.dt, chs, keep_cols_GRDR=COLS_GRDR)
-            except (NoProductsError, FileDownloadError, DownloadShortCircuitError, BadPJError) as err:
+            except PDSError:
                 print(f"Skipping PJ: {pj}")
                 skipped_PJs.append(pj)
                 continue
