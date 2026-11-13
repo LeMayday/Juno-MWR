@@ -15,7 +15,22 @@ def F_p(x):
     return x * kv(2/3, x)
 
 
+def test_vectorization():
+    truth = __F_prim(1)
+    in1 = np.ones(10)
+    out1 = F(in1)
+    assert in1.shape == out1.shape
+    assert np.all(out1 == truth)
+    print("Passed 1D")
+    in3 = np.ones((10, 10, 10))
+    out3 = F(in3)
+    assert in3.shape == out3.shape
+    assert np.all(out3 == truth)
+    print("Passed 3D")
+
+
 def main():
+    test_vectorization()
     eta = np.logspace(-2.3, 1.1, 300)
     fig = plt.figure(figsize=(8,6))
     ax = fig.add_subplot(1, 1, 1)
@@ -35,7 +50,7 @@ def main():
     ax.set_yticks([0,1])
 
     fig.tight_layout()
-    fig.savefig(f"frequency_response_curves.png", dpi=300)
+    fig.savefig(f"images/frequency_response_curves.png", dpi=300)
 
 
 if __name__ == '__main__':
