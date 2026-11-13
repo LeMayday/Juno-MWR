@@ -1,11 +1,13 @@
 # modules
 import numpy as np
 from numpy.linalg import norm
+import pandas as pd
 
 # local files
-from mshell_map import alpha, alpha_eq, MeshInterpolator
 from global_vars import ONE_D_NDArray, TWO_D_NDArray, THREE_D_NDArray, CHS, NU_O
+from mshell_map import alpha, alpha_eq, MeshInterpolator, make_Rlos
 from bessel_functions import F, F_p
+from PDS_helper import get_Juno_pos_RJ, get_boresight_dir
 
 
 E0 = 5000; EPS = 2.25   # eqn 11
@@ -132,4 +134,25 @@ def los_integrate(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray, MI: MeshInterpolat
     I_C = I(B_Gauss=(B_los_norm * nT_to_Gauss), cos2chi=np.ones_like(B_los_norm), alpha=alpha_los, n_e=n_e, E_range=E_range, s_range=s_range, CH=CH)
     return T(I_C, CH=CH)
 
+
+def imitate_IRDR(GRDR_data_pj: pd.DataFrame, MI: MeshInterpolator, E_range: ONE_D_NDArray, sN: int) -> pd.DataFrame:
+    smin=0.2; smax=7
+    s_range = np.linspace(smin, smax, sN + 1)
+    Jn_SIII = get_Juno_pos_RJ(GRDR_data_pj)
+
+    boresight_SIII_ch1 = get_boresight_dir(GRDR_data_pj=GRDR_data_pj, CH=1)
+    boresight_SIII_ch2 = get_boresight_dir(GRDR_data_pj=GRDR_data_pj, CH=2)
+    r_los1 = make_Rlos(Jn_SIII, boresight_SIII_ch1, smin=smin, smax=smax, sN=sN)
+    r_los2 = make_Rlos(Jn_SIII, boresight_SIII_ch2, smin=smin, smax=smax, sN=sN)
+
+    Ta_data = np.zeros(Jn_SIII.shape[0], 6)  # initialize array of brightness temps per channel
+    for CH in CHS:
+        if CH == CHS.CH1:
+            r_los, r_b = r_los1, boresight_SIII_ch1
+        else:
+            r_los, r_b = r_los2, boresight_SIII_ch2
+        Ta_data[CH] = los_integrate(r_los=r_los, r_b=r_b, MI=MI, E_range=E_range, s_range=s_range, CH=CH)
+
+    time_data = GRDR_data_pj[['t_ephem_time', 't_utc_doy']].to_numpy()
+    return pd.DataFrame(np.concatenate((time_data, Ta_data), axis=1), columns=['Time_ET', 'Time_UTC', f"Ch{ch}" for ch in CHS])
 
