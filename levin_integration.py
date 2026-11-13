@@ -5,9 +5,13 @@ import pandas as pd
 
 # local files
 from global_vars import ONE_D_NDArray, TWO_D_NDArray, THREE_D_NDArray, CHS, NU_O
-from mshell_map import alpha, alpha_eq, MeshInterpolator, make_Rlos
+from mshell_map import alpha, alpha_eq, MeshInterpolator, mshell_argparser, make_Rlos
 from bessel_functions import F, F_p
-from PDS_helper import get_Juno_pos_RJ, get_boresight_dir
+from banana_slug import banana_argparser, banana_plot
+from PDS_helper import load_PJ_data, get_Juno_pos_RJ, get_boresight_dir
+
+# default
+import argparse
 
 
 E0 = 5000; EPS = 2.25   # eqn 11
@@ -156,3 +160,31 @@ def imitate_IRDR(GRDR_data_pj: pd.DataFrame, MI: MeshInterpolator, E_range: ONE_
     time_data = GRDR_data_pj[['t_ephem_time', 't_utc_doy']].to_numpy()
     return pd.DataFrame(np.concatenate((time_data, Ta_data), axis=1), columns=['Time_ET', 'Time_UTC', f"Ch{ch}" for ch in CHS])
 
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-f', "--mesh-file", required=True, type=str, help="npz file containing mesh information")
+    subparsers = parser.add_subparsers(dest="analysis", required=True)
+    banana_parser = subparsers.add_parser("banana", help="Make banana plot")
+    banana_argparser(banana_parser)
+    mshell_parser = subparsers.add_parser("mshell", help="Make M-shell plot")
+    mshell_argparser(mshell_parser)
+    mshell_parser.set_defaults(mesh_file=argparse.SUPPRESS)
+    args = parser.parse_args()
+
+    chs = np.array([int(ch) for ch in args.ch.split(',')])
+    for ch in chs: assert ch in range(1, 7), "Valid channel numbers are 1-6"    # validate channel inputs
+    MI = MeshInterpolator(args.mesh_file)
+    E_range = np.linspace(0.1, 50, 101)
+
+    if args.analysis == "banana":
+        _, GRDR_data_pj = load_PJ_data(args.PJ, args.dt, np.array(chs))
+        IRDR_data_pj = imitate_IRDR(GRDR_data_pj=GRDR_data_pj, MI=MI, E_range=E_range, sN=50)
+        banana_plot(IRDR_data_pj, GRDR_data_pj, args.dspr, f"Levin_PJs{args.PJ}_CHs{args.ch}_dt{args.dt}", args.type)
+
+    elif args.analysis == "mshell":
+        pass
+
+
+if __name__ == "__main__":
+    main()
