@@ -10,7 +10,7 @@ from bessel_functions import F, F_p
 
 E0 = 5000; EPS = 2.25   # eqn 11
 MJ = 4.218              # [gauss RJ^3] eqn 9
-C = 1.52E-3             # C (erg/s/Gauss) * c^2 (cm/s)^2 / k (erg/K) / nu^2 (GHz)^2
+C = 1.09E7              # C (erg/s/Gauss) * c^2 (cm/s)^2 / k (erg/K) / (Hz/GHz)^2 * (cm/RJ)
 E_2PIMC = 2.79E-3       # GHz / Gauss
 nT_to_Gauss = 1E-5
                     # n1, n2,   A_L,    B_L
@@ -48,7 +48,15 @@ def gamma(E: np.ndarray) -> np.ndarray:
 
 def N(alpha: TWO_D_NDArray, B: TWO_D_NDArray, Beq: TWO_D_NDArray, E_range: ONE_D_NDArray) -> THREE_D_NDArray:
     """
-    Number density (assume cm^-3) --- eqns 8-11
+    Number density (assume cm^-3) per unit energy per unit pitch angle --- eqns 8-11
+
+    alpha: local pitch angles (radians) (num samples, num LOS pts)
+
+    B: local B magnitude (Gauss) (num samples, num LOS pts)
+
+    Beq: mapped equatorial B magnitude (Gauss) (num samples, num LOS pts)
+
+    E_range: range of energies over which to integrate (MeV)
     """
     a_eq = alpha_eq(alpha, Beq, B)                  # num samples x num LOS pts
     L = (MJ / Beq)**(1/3)                           # eqn 9 --- num samples x num LOS pts
@@ -59,6 +67,23 @@ def N(alpha: TWO_D_NDArray, B: TWO_D_NDArray, Beq: TWO_D_NDArray, E_range: ONE_D
 
 
 def I(B_Gauss: THREE_D_NDArray, cos2chi: TWO_D_NDArray, alpha: TWO_D_NDArray, n_e: THREE_D_NDArray, E_range: ONE_D_NDArray, s_range: ONE_D_NDArray, CH: CHS) -> TWO_D_NDArray:
+    """
+    Return stokes I/C per unit RJ
+
+    B_vec: local B magnitude (Gauss) (num samples, num LOS pts)
+
+    cos2chi: cos(2*chi), where chi is depends on MWR pointing geometry (num samples, num LOS pts)
+
+    alpha: local pitch angle (radians) (num samples, num LOS pts)
+
+    n_e: electron density (cm^-3 rad^-1 MeV^-1)
+
+    E_range: vector of energies over which to integrate (MeV)
+
+    s_range: vector of distances over which to integrate (RJ)
+
+    CH: channel enum
+    """
     sin_alpha = np.sin(alpha)
     nu_c = 3/2 * gamma(E_range)**2[None, None, :] * E_2PIMC * B_Gauss[:, :, None] * sin_alpha[:, :, None]   # num samples x num LOS pts x num E pts
 
@@ -74,6 +99,9 @@ def I(B_Gauss: THREE_D_NDArray, cos2chi: TWO_D_NDArray, alpha: TWO_D_NDArray, n_
 
 
 def T(I_C: TWO_D_NDArray, CH: CHS) -> TWO_D_NDArray:
+    """
+    Takes Stokes parameter as (num channels, num samples)
+    """
     return C * I_C / NU_O[CH]**2
 
 
