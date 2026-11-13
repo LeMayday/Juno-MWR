@@ -4,7 +4,7 @@ from numpy.linalg import norm
 
 # local files
 from global_vars import ONE_D_NDArray, TWO_D_NDArray, THREE_D_NDArray
-from mshell_map import UGLI, alpha, alpha_eq
+from mshell_map import alpha, alpha_eq, MeshInterpolator
 from bessel_functions import F, F_p
 
 
@@ -13,6 +13,7 @@ MJ = 4.218              # [gauss RJ^3] eqn 9
 C = 1.52E-3             # C (erg/s/Gauss) * c^2 (cm/s)^2 / k (erg/K) / nu^2 (GHz)^2
 E_2PIMC = 2.79E-3       # GHz / Gauss
 NU_O = np.array([0.6, 1.248, 2.597, 5.215, 10.004, 21.9])   # GHz
+nT_to_Gauss = 1E-5
                     # n1, n2,   A_L,    B_L
 TABLE_1 = np.array([[1.0, 50,   6.0,   28.0],
                     [1.0, 46,   8.5,   14.5],
@@ -77,14 +78,14 @@ def T(I_C: TWO_D_NDArray) -> TWO_D_NDArray:
     return C * I_C
 
 
-def los_integrate(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray, UGLI_B: UGLI, UGLI_Beq: UGLI, UGLI_Bin: UGLI, UGLI_Bis: UGLI, E_range: ONE_D_NDArray) -> ONE_D_NDArray:
-    B_los = UGLI_B(r_los)
+def los_integrate(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray, MI: MeshInterpolator, E_range: ONE_D_NDArray, s_range: ONE_D_NDArray) -> ONE_D_NDArray:
+    B_los = MI.B(r_los)
     B_los_norm = norm(B_los, axis=-1)
-    Beq_los = UGLI_Beq(r_los)
+    Beq_los = MI.Beq(r_los)
     Beq_los_norm = norm(Beq_los, axis=-1)
-    Bin_los = UGLI_Bin(r_los)
+    Bin_los = MI.Bin(r_los)
     Bin_los_norm = norm(Bin_los, axis=-1)
-    Bis_los = UGLI_Bis(r_los)
+    Bis_los = MI.Bis(r_los)
     Bis_los_norm = norm(Bis_los, axis=-1)
 
     alpha_los = alpha(r_b, B_los)
@@ -97,5 +98,11 @@ def los_integrate(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray, UGLI_B: UGLI, UGLI
     n_e[loss_cone_mask, :] = np.nan     # num samples x num LOS pts x num E pts
     n_e[~np.isfinite(n_e)] = 0          # reset nan values to 0 for integration
 
-    B_los_Gauss = B_los_norm / 1E5
+    # Bx = np.einsum('ijk, ik -> ij', B_vec, x_vec)
+    # By = np.einsum('ijk, ik -> ij', B_vec, y_vec)
+    # cos2chi = (Bx**2 - By**2) / (Bx**2 + By**2)     # comes from tan(chi) = By / Bx
+
+    I_C = I(B_Gauss=(B_los_norm * nT_to_Gauss), cos2chi=np.ones_like(B_los_norm), alpha=alpha_los, n_e=n_e, E_range=E_range, s_range=s_range)
+    return T(I_C)
+
 
