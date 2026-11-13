@@ -58,9 +58,7 @@ def N(alpha: TWO_D_NDArray, B: TWO_D_NDArray, Beq: TWO_D_NDArray, E_range: ONE_D
     return n_ea[:, :, None] * n_eE
 
 
-def I(B_vec: THREE_D_NDArray, x_vec: TWO_D_NDArray, y_vec: THREE_D_NDArray, alpha: TWO_D_NDArray, n_e: THREE_D_NDArray, E_range: ONE_D_NDArray, s_range: ONE_D_NDArray) -> TWO_D_NDArray:
-    B = norm(B_vec, axis=-1)
-    B_Gauss = B / 1E5
+def I(B_Gauss: THREE_D_NDArray, cos2chi: TWO_D_NDArray, alpha: TWO_D_NDArray, n_e: THREE_D_NDArray, E_range: ONE_D_NDArray, s_range: ONE_D_NDArray) -> TWO_D_NDArray:
     sin_alpha = np.sin(alpha)
     nu_c = 3/2 * gamma(E_range)**2[None, None, :] * E_2PIMC * B_Gauss[:, :, None] * sin_alpha[:, :, None]   # num samples x num LOS pts x num E pts
     
@@ -68,9 +66,6 @@ def I(B_vec: THREE_D_NDArray, x_vec: TWO_D_NDArray, y_vec: THREE_D_NDArray, alph
     stokes_I_C = B_Gauss[None, :, :, None] * sin_alpha[None, :, :, None] *   F(NU_O[:, None, None, None] / nu_c[None, :, :, :]) * n_e[None, :, :, :]    # missing C*2pi
     stokes_Q_C = B_Gauss[None, :, :, None] * sin_alpha[None, :, :, None] * F_p(NU_O[:, None, None, None] / nu_c[None, :, :, :]) * n_e[None, :, :, :]    # missing C*2pi
 
-    Bx = np.einsum('ijk, ik -> ij', B_vec, x_vec)
-    By = np.einsum('ijk, ik -> ij', B_vec, y_vec)
-    cos2chi = (Bx**2 - By**2) / (Bx**2 + By**2)     # comes from tan(chi) = By / Bx
     stokes_I_C_prime = 0.5 * (stokes_I_C + stokes_Q_C * cos2chi[None, :, :, None])
 
     stokes_I_C_prime = np.trapezoid(stokes_I_C_prime, E_range, axis=-1)     # integrate over E
