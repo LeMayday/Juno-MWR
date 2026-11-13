@@ -70,6 +70,8 @@ class MeshInterpolator:
         self.B     = UGLI(points=points, values=mesh_data["B_mesh"])
         self.Beq   = UGLI(points=points, values=mesh_data["B_mesh_eq"])
         self.M     = UGLI(points=points, values=mesh_data["Mshell"])
+        self.Bin   = UGLI(points=points, values=mesh_data["B_mesh_in"])
+        self.Bis   = UGLI(points=points, values=mesh_data["B_mesh_is"])
         self.__lonxy = UGLI(points=points, values=mesh_data["dipole_xy"])
 
     def lonxy(self, xi):
