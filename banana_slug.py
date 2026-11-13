@@ -151,14 +151,18 @@ def plot_contours(ax: Axes, lat_folded: np.ndarray, lon_folded: np.ndarray):
     ax.clabel(lon_contours, inline=True, fmt=lambda x: f"{int(round(x)) % 360}")
 
 
-def main():
-    parser = argparse.ArgumentParser()
+def banana_argparser(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument("--PJ", required=True, type=int, help="Perijove")
     parser.add_argument("--dt", required=True, type=float, help="Delta time in minutes")
     parser.add_argument("--ch", required=False, type=str, default="1,2,3,4,5,6", help="List of channels separated by comma")
     parser.add_argument("--type", required=False, type=str, default=None, choices=["SIII", "SIII_NJ", "VIP4", "VIP4_NJ"], help="Contour overlay type")
     parser.add_argument("--dspr", required=False, type=int, default=307, help="Hundred ms (deciseconds) per rotation")   # 30.7 s/rot Santos-Costa+2017, 1 sample per 100 ms
-    args = parser.parse_args()
+    return parser
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    args = banana_argparser(parser).parse_args()
     chs = np.array([int(ch) for ch in args.ch.split(',')])
     for ch in chs: assert ch in range(1, 7), "Valid channel numbers are 1-6"    # validate channel inputs
 

@@ -245,14 +245,18 @@ def map_Ta_to_M(IRDR_data_pj: DataFrame, GRDR_data_pj: DataFrame, M: float, pj: 
     return out_Ta, out_alpha
 
 
-def main():
-    parser = argparse.ArgumentParser()
+def mshell_argparser(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument("--dt", required=True, type=float, help="Delta time around each perijove in minutes")
     parser.add_argument("--ch", required=False, type=str, default="1,2,3,4,5,6", help="List of channels separated by comma")
     parser.add_argument("--PJs", required=True, type=str, help="Perijove range (e.g. 1,2,5,6 or 1-7 or 1,3-6)")
     parser.add_argument("--M", required=True, type=str, help="M-shell")
     parser.add_argument('-f', "--mesh-file", required=True, type=str, help="npz file containing mesh information")
-    args = parser.parse_args()
+    return parser
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    args = mshell_argparser(parser).parse_args()
 
     # input validation
     chs = np.array([int(ch) for ch in args.ch.split(',')])
