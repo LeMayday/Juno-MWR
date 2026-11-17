@@ -148,13 +148,13 @@ def imitate_IRDR(GRDR_data_pj: pd.DataFrame, MI: MeshInterpolator, E_range: ONE_
     r_los1 = make_Rlos(Jn_SIII, boresight_SIII_ch1, smin=smin, smax=smax, sN=sN)
     r_los2 = make_Rlos(Jn_SIII, boresight_SIII_ch2, smin=smin, smax=smax, sN=sN)
 
-    Ta_data = np.zeros(Jn_SIII.shape[0], 6)  # initialize array of brightness temps per channel
+    Ta_data = np.zeros((Jn_SIII.shape[0], 6))  # initialize array of brightness temps per channel
     for CH in CHS:
         if CH == CHS.CH1:
             r_los, r_b = r_los1, boresight_SIII_ch1
         else:
             r_los, r_b = r_los2, boresight_SIII_ch2
-        Ta_data[CH] = los_integrate(r_los=r_los, r_b=r_b, MI=MI, E_range=E_range, s_range=s_range, CH=CH)
+        Ta_data[:, CH] = los_integrate(r_los=r_los, r_b=r_b, MI=MI, E_range=E_range, s_range=s_range, CH=CH)
 
     time_data = GRDR_data_pj[['t_ephem_time', 't_utc_doy']].to_numpy()
     return pd.DataFrame(np.concatenate((time_data, Ta_data), axis=1), columns=['Time_ET', 'Time_UTC', f"Ch{ch}" for ch in CHS])
