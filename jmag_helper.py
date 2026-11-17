@@ -133,11 +133,13 @@ def generate_Bfield_mesh(M_max: float, N: float, max_workers: int):
     z_vec = np.linspace(-M_max*2/3, M_max*2/3, N*2//3 + 1)
     X, Y, Z = np.meshgrid(x_vec, y_vec, z_vec, indexing='ij')
 
+    print("Computing B vectors")
     B_mesh = B(X, Y, Z)     # these positions are SIII!
 
     num_bytes = (N+1) * (N+1) * (N*2//3 + 1) * MAXLEN * 8   # total size of X,Y,Z x 1000 pts per trace x 8 bytes per float64
-    n_splits = int(np.ceil((num_bytes / 2E9)**(1/3)))       # aim for 2 GB: num_bytes / n_splits**3 ~= 2 GB
+    n_splits = int(np.ceil((num_bytes / 4E9)**(1/3)))       # aim for 4 GB: num_bytes / n_splits**3 ~= 4 GB
     n_splits *= 2                                           # be more conservative since extra memory could be used by TraceField object
+    print("Tracing field...")
     footprint_data = tracefield_chunked(X, Y, Z, n_splits, max_workers)    # these positions are SIII! --- eq_data is domain x (x3, y3, z3, M, lon) along last axis, lon in radians
     B_mesh_eq = B(footprint_data[..., IDX.XEQ], footprint_data[..., IDX.YEQ], footprint_data[..., IDX.ZEQ])
     B_mesh_in = B(footprint_data[..., IDX.XIN], footprint_data[..., IDX.YIN], footprint_data[..., IDX.ZIN])
