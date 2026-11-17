@@ -6,7 +6,7 @@ import pandas as pd
 # local files
 from global_vars import ONE_D_NDArray, TWO_D_NDArray, THREE_D_NDArray, CHS, NU_O, process_ch_inputs
 from mshell_map import alpha, alpha_eq, MeshInterpolator, mshell_argparser, make_Rlos
-from bessel_functions import F, F_p
+from bessel_functions import F, F_p, approxF
 from banana_slug import banana_argparser, banana_plot
 from PDS_helper import load_PJ_data, get_Juno_pos_RJ, get_boresight_dir
 from time_series import time_series_argparser, time_series_plot
@@ -94,8 +94,8 @@ def I(B_Gauss: THREE_D_NDArray, cos2chi: TWO_D_NDArray, alpha: TWO_D_NDArray, n_
     nu_c = 3/2 * gamma(E_range[None, None, :])**2 * E_2PIMC * B_Gauss[:, :, None] * sin_alpha[:, :, None]   # num samples x num LOS pts x num E pts
 
     # num samples x num LOS pts x num E pts
-    stokes_I_C = B_Gauss[:, :, None] * sin_alpha[:, :, None] *   F(NU_O[CH] / nu_c[...]) * n_e[...]    # missing C*2pi
-    stokes_Q_C = B_Gauss[:, :, None] * sin_alpha[:, :, None] * F_p(NU_O[CH] / nu_c[...]) * n_e[...]    # missing C*2pi
+    stokes_I_C = B_Gauss[:, :, None] * sin_alpha[:, :, None] * approxF(NU_O[CH] / nu_c[...]) * n_e[...]    # missing C*2pi
+    stokes_Q_C = B_Gauss[:, :, None] * sin_alpha[:, :, None] *     F_p(NU_O[CH] / nu_c[...]) * n_e[...]    # missing C*2pi
 
     stokes_I_C_prime = 0.5 * (stokes_I_C + stokes_Q_C * cos2chi[:, :, None])      # polarized receiver
 
