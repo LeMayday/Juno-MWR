@@ -4,11 +4,12 @@ from numpy.linalg import norm
 import pandas as pd
 
 # local files
-from global_vars import ONE_D_NDArray, TWO_D_NDArray, THREE_D_NDArray, CHS, NU_O
+from global_vars import ONE_D_NDArray, TWO_D_NDArray, THREE_D_NDArray, CHS, NU_O, process_ch_inputs
 from mshell_map import alpha, alpha_eq, MeshInterpolator, mshell_argparser, make_Rlos
 from bessel_functions import F, F_p
 from banana_slug import banana_argparser, banana_plot
 from PDS_helper import load_PJ_data, get_Juno_pos_RJ, get_boresight_dir
+from time_series import time_series_argparser, time_series_plot
 
 # default
 import argparse
@@ -164,6 +165,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', "--mesh-file", required=True, type=str, help="npz file containing mesh information")
     subparsers = parser.add_subparsers(dest="analysis", required=True)
+    time_parser = subparsers.add_parser("time", help="Make time series plot")
+    time_series_argparser(time_parser)
     banana_parser = subparsers.add_parser("banana", help="Make banana plot")
     banana_argparser(banana_parser)
     mshell_parser = subparsers.add_parser("mshell", help="Make M-shell plot")
@@ -171,13 +174,17 @@ def main():
     mshell_parser.set_defaults(mesh_file=argparse.SUPPRESS)
     args = parser.parse_args()
 
-    chs = np.array([int(ch) for ch in args.ch.split(',')])
-    for ch in chs: assert ch in range(1, 7), "Valid channel numbers are 1-6"    # validate channel inputs
+    chs = process_ch_inputs(args.ch)
     MI = MeshInterpolator(args.mesh_file)
-    E_range = np.linspace(0.1, 50, 101)
+    E_range = np.linspace(0.1, 50, 51)
 
-    if args.analysis == "banana":
-        _, GRDR_data_pj = load_PJ_data(args.PJ, args.dt, np.array(chs))
+    if args.analysis == "time":
+        _, GRDR_data_pj = load_PJ_data(args.PJ, args.dt, chs)
+        IRDR_data_pj = imitate_IRDR(GRDR_data_pj=GRDR_data_pj, MI=MI, E_range=E_range, sN=50)
+        time_series_plot(IRDR_data_pj, args.PJ)
+        IRDR_data_pj.to_csv(f"IRDR_data_PJ{args.PJ}_dt{args.dt}_sN{50}.csv")
+    elif args.analysis == "banana":
+        _, GRDR_data_pj = load_PJ_data(args.PJ, args.dt, chs)
         IRDR_data_pj = imitate_IRDR(GRDR_data_pj=GRDR_data_pj, MI=MI, E_range=E_range, sN=50)
         banana_plot(IRDR_data_pj, GRDR_data_pj, args.dspr, f"Levin_PJs{args.PJ}_CHs{args.ch}_dt{args.dt}", args.type)
 
