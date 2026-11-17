@@ -157,8 +157,8 @@ def imitate_IRDR(GRDR_data_pj: pd.DataFrame, MI: MeshInterpolator, E_range: ONE_
             r_los, r_b = r_los2, boresight_SIII_ch2
         Ta_data[:, CH] = los_integrate(r_los=r_los, r_b=r_b, MI=MI, E_range=E_range, s_range=s_range, CH=CH)
 
-    time_data = GRDR_data_pj[['t_ephem_time', 't_utc_doy']].to_numpy()
-    return pd.DataFrame(np.concatenate((time_data, Ta_data), axis=1), columns=(['Time_ET', 'Time_UTC'] + [CH for CH in CHS]))
+    time_data = GRDR_data_pj[['Time_ET', 'Time_UTC']].to_numpy()
+    return pd.DataFrame(np.concatenate((time_data, Ta_data), axis=1), columns=(['Time_ET', 'Time_UTC'] + [CH.name for CH in CHS]))
 
 
 def main():
