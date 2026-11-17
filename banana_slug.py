@@ -8,7 +8,6 @@ from unwrap import unwrap
 
 # local files
 from PDS_helper import COLS_GRDR, load_PJ_data, get_SIII_lat_lon, get_VIP4_lat_lon, get_PC_lat_lon
-from coordinates import get_PJ_time_ET
 from global_vars import VMAX
 
 # default
@@ -69,21 +68,6 @@ def make_subplots(fig: Figure, num_chs: int) -> list[Axes]:
             else:           # bottom row
                 axes.append(fig.add_subplot(nrows, ncols * 2, (2 * ch, 2 * ch + 1)))
     return axes
-
-
-def time_series_plot(IRDR_data_pj: pd.DataFrame, pj: int):
-    IRDR_data_pj = IRDR_data_pj.iloc[::10]  # downsampled to 1/s
-    pj_time = get_PJ_time_ET(pj)
-    minutes_delta = (IRDR_data_pj['Time_ET'].to_numpy() - pj_time) / 60
-
-    fig = plt.figure(figsize=(12,8))
-    axes = make_subplots(fig, len(IRDR_data_pj.columns[2:]))
-    for i, ch in enumerate(IRDR_data_pj.columns[2:]):   # skip time column
-        axes[i].plot(minutes_delta, IRDR_data_pj[ch].to_numpy(), label=ch)
-        axes[i].axvline(x=0, ls='--', c='k')
-        axes[i].set_title(ch)
-    fig.tight_layout()
-    plt.show()
 
 
 def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame, samples_per_rot, params_str: str, overlay_type: Optional[str] = None, vmax: list = None):
@@ -167,7 +151,6 @@ def main():
     for ch in chs: assert ch in range(1, 7), "Valid channel numbers are 1-6"    # validate channel inputs
 
     IRDR_data_pj, GRDR_data_pj = load_PJ_data(args.PJ, args.dt, np.array(chs))
-    # time_series_plot(IRDR_data_pj, args.PJ)
     banana_plot(IRDR_data_pj, GRDR_data_pj, args.dspr, f"PJs{args.PJ}_CHs{args.ch}_dt{args.dt}", args.type)
 
 
