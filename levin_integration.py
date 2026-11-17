@@ -90,7 +90,7 @@ def I(B_Gauss: THREE_D_NDArray, cos2chi: TWO_D_NDArray, alpha: TWO_D_NDArray, n_
     CH: channel enum
     """
     sin_alpha = np.sin(alpha)
-    nu_c = 3/2 * gamma(E_range)**2[None, None, :] * E_2PIMC * B_Gauss[:, :, None] * sin_alpha[:, :, None]   # num samples x num LOS pts x num E pts
+    nu_c = 3/2 * gamma(E_range[None, None, :])**2 * E_2PIMC * B_Gauss[:, :, None] * sin_alpha[:, :, None]   # num samples x num LOS pts x num E pts
 
     # num samples x num LOS pts x num E pts
     stokes_I_C = B_Gauss[:, :, None] * sin_alpha[:, :, None] *   F(NU_O[CH] / nu_c[...]) * n_e[...]    # missing C*2pi
