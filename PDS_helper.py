@@ -246,8 +246,9 @@ def get_Juno_pos_RJ(GRDR_data_pj: pd.DataFrame, col_prefix = "S3RH") -> ONE_D_ND
     return get_Juno_pos(GRDR_data_pj, col_prefix) / RJ
 
 
-def get_boresight_dir(GRDR_data_pj: pd.DataFrame, CH: Literal[1, 2], col_prefix = "S3RH") -> TWO_D_NDArray:
+def get_boresight_dir(GRDR_data_pj: pd.DataFrame, CH: Literal[CHS.CH1, CHS.CH2], col_prefix = "S3RH") -> TWO_D_NDArray:
     """
     Returns normalized boresight x,y,z, components.
     """
+    CH = CH + 1     # CHS are 0-indexed, GRDR data titles are 1-indexed
     return GRDR_data_pj[[f'{col_prefix}_x_B{CH}', f'{col_prefix}_y_B{CH}', f'{col_prefix}_z_B{CH}']].to_numpy()

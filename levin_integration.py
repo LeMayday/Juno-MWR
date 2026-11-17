@@ -144,8 +144,8 @@ def imitate_IRDR(GRDR_data_pj: pd.DataFrame, MI: MeshInterpolator, E_range: ONE_
     s_range = np.linspace(smin, smax, sN + 1)
     Jn_SIII = get_Juno_pos_RJ(GRDR_data_pj)
 
-    boresight_SIII_ch1 = get_boresight_dir(GRDR_data_pj=GRDR_data_pj, CH=1)
-    boresight_SIII_ch2 = get_boresight_dir(GRDR_data_pj=GRDR_data_pj, CH=2)
+    boresight_SIII_ch1 = get_boresight_dir(GRDR_data_pj=GRDR_data_pj, CH=CHS.CH1)
+    boresight_SIII_ch2 = get_boresight_dir(GRDR_data_pj=GRDR_data_pj, CH=CHS.CH2)
     r_los1 = make_Rlos(Jn_SIII, boresight_SIII_ch1, smin=smin, smax=smax, sN=sN)
     r_los2 = make_Rlos(Jn_SIII, boresight_SIII_ch2, smin=smin, smax=smax, sN=sN)
 
