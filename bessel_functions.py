@@ -11,11 +11,33 @@ def __F_prim(x):
 def F(x):
     return np.vectorize(__F_prim)(x)
 
+def approxF(x):
+    # see https://journals.aps.org/prd/abstract/10.1103/PhysRevD.82.043002
+    x23 = x**(2/3)
+    num = 1 + 0.884 * x23 + 0.471 * x23**2
+    den = 1 + 1.64 * x23 + 0.974 * x23**2
+    return 2.15 * x**(1/3) * (1 + 3.06*x)**(1/6) * num / den * np.exp(-x)
+
 def F_p(x):
     return x * kv(2/3, x)
 
 
+def test_vectorization():
+    truth = __F_prim(1)
+    in1 = np.ones(10)
+    out1 = F(in1)
+    assert in1.shape == out1.shape
+    assert np.all(out1 == truth)
+    print("Passed 1D")
+    in3 = np.ones((10, 10, 10))
+    out3 = F(in3)
+    assert in3.shape == out3.shape
+    assert np.all(out3 == truth)
+    print("Passed 3D")
+
+
 def main():
+    test_vectorization()
     eta = np.logspace(-2.3, 1.1, 300)
     fig = plt.figure(figsize=(8,6))
     ax = fig.add_subplot(1, 1, 1)
@@ -35,7 +57,26 @@ def main():
     ax.set_yticks([0,1])
 
     fig.tight_layout()
-    fig.savefig(f"frequency_response_curves.png", dpi=300)
+    fig.savefig(f"images/frequency_response_curves.png", dpi=300)
+
+
+    eta = np.logspace(-5, 1.1, 500)
+    fig = plt.figure(figsize=(8,6))
+    ax = fig.add_subplot(1, 1, 1)
+    res = F(eta) - approxF(eta)
+    ax.loglog(eta, np.abs(res), linestyle='-', label=r'$F - F_{approx}$')
+
+    ax.set_xlabel(r'$\nu/\nu_c$', fontsize=14)
+    ax.set_ylabel(r"$F - F_{approx}$ Residual")
+
+    ax.set_xlim(eta[0], eta[-1])
+
+    ax.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f'{x:g}'))
+    ax.tick_params(axis='x', labelsize=14)
+    ax.tick_params(axis='y', labelsize=14)
+
+    fig.tight_layout()
+    fig.savefig(f"images/frequency_response_curves_diff.png", dpi=300)
 
 
 if __name__ == '__main__':

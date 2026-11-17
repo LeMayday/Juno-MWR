@@ -4,17 +4,19 @@ from numpy.linalg import norm
 import matplotlib.pyplot as plt
 from scipy.stats import binned_statistic_2d
 from scipy.ndimage import map_coordinates
+from pandas import DataFrame
 
 # local files
 from banana_slug import make_subplots
-from PDS_helper import load_PJ_data, NoProductsError, FileDownloadError, DownloadShortCircuitError, BadPJError
+from PDS_helper import load_PJ_data, get_Juno_pos_RJ, get_boresight_dir, PDSError
 from synchrotron_map import parse_PJs, stack_data
 from coordinates import lat_lonE
-from global_vars import RJ, ONE_D_NDArray, TWO_D_NDArray, THREE_D_NDArray, FOUR_D_NDArray, VMAX
+from global_vars import ONE_D_NDArray, TWO_D_NDArray, THREE_D_NDArray, VMAX
 
 # default
 import argparse
 from pathlib import Path
+from typing import Literal
 
 COLS_GRDR = ['t_ephem_time', 't_utc_doy',
              'PC_lon_JsB1', 'PC_lon_JsB2',
@@ -57,6 +59,31 @@ class UniformGridLinearInterpolator:
 UGLI = UniformGridLinearInterpolator  # type alias
 
 
+class MeshInterpolator:
+    def __init__(self, mesh_file: str):
+        # construct RegularGridInterpolators for each mesh value
+        mesh_data = np.load(mesh_file)
+        x_vec = mesh_data["x_vec"]
+        y_vec = mesh_data["y_vec"]
+        z_vec = mesh_data["z_vec"]
+        points = (x_vec, y_vec, z_vec)
+        self.B     = UGLI(points=points, values=mesh_data["B_mesh"])
+        self.Beq   = UGLI(points=points, values=mesh_data["B_mesh_eq"])
+        self.M     = UGLI(points=points, values=mesh_data["Mshell"])
+        self.Bin   = UGLI(points=points, values=mesh_data["B_mesh_in"])
+        self.Bis   = UGLI(points=points, values=mesh_data["B_mesh_is"])
+        self.__lonxy = UGLI(points=points, values=mesh_data["dipole_xy"])
+
+    def lonxy(self, xi):
+        """
+        Interpolate magnetic longitudes.
+        """
+        interp_lonxy = self.__lonxy(xi)     # interpolate xy since these are continuous
+        _, interp_lon = lat_lonE(interp_lonxy[..., 0], interp_lonxy[..., 1], 0)
+        return interp_lon
+
+
+
 def alpha(r_b: np.ndarray, B: np.ndarray) -> np.ndarray:
     """
     r_b: array of boresight vectors
@@ -80,28 +107,25 @@ def alpha_eq(alpha: np.ndarray, Beq: np.ndarray, B: np.ndarray) -> np.ndarray:
     return np.asin(np.sin(alpha) * np.sqrt(Beq / B))
 
 
-def r_los(r_sc: np.ndarray, r_b: np.ndarray, smin: float, smax: float, sN: int):
+def make_Rlos(r_sc: np.ndarray, r_b: np.ndarray, smin: float, smax: float, sN: int):
     # r_sc is vector of normalized S/C pos vectors in SIII
     s = np.linspace(smin, smax, sN + 1)                 # LOS distance
     s_los = r_b[:, None, :] * s[None, :, None]          # num samples x num LOS pts x 3
     return r_sc[:, None, :] + s_los                     # add spacecraft positions to LOS points
 
 
-def intersect_alphas_lons(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray,
-                          UGLI_M: UGLI, UGLI_B: UGLI, UGLI_Beq: UGLI, UGLI_lonxy: UGLI,
-                          M: float, dM: float) -> tuple[ONE_D_NDArray, ONE_D_NDArray, ONE_D_NDArray, TWO_D_NDArray]:
+def intersect_alphas_lons(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray, MI: MeshInterpolator, M: float, dM: float) -> tuple[ONE_D_NDArray, ONE_D_NDArray, ONE_D_NDArray, TWO_D_NDArray]:
     # r_los is position at each sample time and at each point along LOS (num samples x num LOS pts x 3)
     # r_b is vector of normalized boresight vectors in SIII
-    M_los = UGLI_M(r_los)                                       # num samples x num LOS pts
+    M_los = MI.M(r_los)                                         # num samples x num LOS pts
     mask_M = np.logical_and(M_los > M - dM, M_los < M + dM)     # where the LOS is looking at the desired M-shell
-    B_los = UGLI_B(r_los)                                       # num samples x num LOS pts x 3
+    B_los = MI.B(r_los)                                         # num samples x num LOS pts x 3
     alpha_los = alpha(r_b, B_los)
 
-    Beq_los = UGLI_Beq(r_los)
+    Beq_los = MI.Beq(r_los)
     alpha_eq_los = alpha_eq(alpha_los, norm(Beq_los, axis=-1), norm(B_los, axis=-1))
 
-    lonxy_los = UGLI_lonxy(r_los)                               # interpolate xy since these are continuous
-    _, lon_los = lat_lonE(lonxy_los[..., 0], lonxy_los[..., 1], 0)
+    lon_los = MI.lonxy(r_los)
 
     # filter regions outside Mshell
     alpha_los[~mask_M] = np.nan
@@ -129,10 +153,17 @@ def mask_jupiter(jupiter_intersections: ONE_D_NDArray) -> ONE_D_NDArray:
     return jupiter_mask
 
 
-def bin_data(values: ONE_D_NDArray, lons: ONE_D_NDArray, alphas: ONE_D_NDArray) -> TWO_D_NDArray:
+def mask_lat(Jn_SIII: TWO_D_NDArray) -> ONE_D_NDArray:
+    Jn_SIII_norm = Jn_SIII / norm(Jn_SIII, axis=-1, keepdims=True)
+    lat, _ = lat_lonE(*Jn_SIII_norm.T)
+    lat_mask = np.logical_and(lat > -20, lat < 20)
+    return lat_mask
+
+
+def bin_data(values: ONE_D_NDArray, lons: ONE_D_NDArray, alphas: ONE_D_NDArray, num_lons: int = 180, num_alphas: int = 90) -> TWO_D_NDArray:
     # longitudes in degrees!
-    lon_bins = np.linspace(0, 360, 181, endpoint=True)
-    alpha_bins = np.linspace(0, 90, 91, endpoint=True)
+    lon_bins = np.linspace(0, 360, num_lons + 1, endpoint=True)
+    alpha_bins = np.linspace(0, 90, num_alphas + 1, endpoint=True)
     bad_input = np.logical_or(np.isnan(lons), np.isnan(alphas))
     values = values[~bad_input]
     lons = lons[~bad_input]
@@ -166,14 +197,68 @@ def plot_data(data: THREE_D_NDArray, chs: list, params_str: str, vmax: list = No
     plt.close(fig)
 
 
-def main():
-    parser = argparse.ArgumentParser()
+def geometry_mask(GRDR_data_pj: DataFrame, UGLI_M: UGLI, M: float, CH: Literal[1, 2]) -> ONE_D_NDArray:
+    Jn_SIII = get_Juno_pos_RJ(GRDR_data_pj)
+    lat_mask = mask_lat(Jn_SIII)                    # mask for near the equator
+    pos_mask = mask_M(Jn_SIII, UGLI_M, M)           # mask for within mshell
+    pos_mask = np.logical_and(pos_mask, lat_mask)
+    jupiter_mask = mask_jupiter(GRDR_data_pj[f"PC_lon_JsB{CH}"].to_numpy())     # mask where looking at jupiter
+    return np.logical_and(~jupiter_mask, pos_mask)
+
+
+def geometry_intersections(GRDR_data_pj: DataFrame, mask: ONE_D_NDArray, M: float, CH: Literal[1, 2],
+                           MI: MeshInterpolator, save_params: str = None) -> tuple[ONE_D_NDArray, ONE_D_NDArray, ONE_D_NDArray]:
+    # grab relevant columns
+    Jn_SIII = get_Juno_pos_RJ(GRDR_data_pj)
+    boresight_SIII = get_boresight_dir(GRDR_data_pj=GRDR_data_pj, CH=CH)
+    Jn_SIII = Jn_SIII[mask, :]                      # mask positions
+    boresight_SIII = boresight_SIII[mask, :]        # mask boresights
+
+    r_los = make_Rlos(r_sc=Jn_SIII, r_b=boresight_SIII, smin=0.2, smax=7, sN=100)
+    alphas, alphas_eq, lons, r_los_mask = intersect_alphas_lons(r_los=r_los, r_b=boresight_SIII, MI=MI, M=M, dM=0.05)
+    if save_params is not None:
+        np.savez(f"npz/MWR_plottables_{save_params}.npz", r_sc=Jn_SIII, r_b=boresight_SIII, r_los=r_los, r_los_mask=r_los_mask)
+    return alphas, alphas_eq, lons
+
+
+def map_Ta_to_M(IRDR_data_pj: DataFrame, GRDR_data_pj: DataFrame, M: float, pj: int,
+                MI: MeshInterpolator, num_lons: int = 180, num_alphas: int = 90) -> tuple[THREE_D_NDArray, THREE_D_NDArray]:
+    print("Calculating intersections")
+    mask1 = geometry_mask(GRDR_data_pj=GRDR_data_pj, UGLI_M=MI.M, M=M, CH=1)
+    mask2 = geometry_mask(GRDR_data_pj=GRDR_data_pj, UGLI_M=MI.M, M=M, CH=2)
+    alphas1, alphas_eq1, lons1 = geometry_intersections(GRDR_data_pj=GRDR_data_pj, mask=mask1, M=M, CH=1, MI=MI, save_params=f"M{M}_PJ{pj}_CH{1}")
+    alphas2, alphas_eq2, lons2 = geometry_intersections(GRDR_data_pj=GRDR_data_pj, mask=mask2, M=M, CH=2, MI=MI, save_params=f"M{M}_PJ{pj}_CH{1}")
+    out_Ta = np.full((6, num_alphas, num_lons), np.nan)
+    out_alpha = np.full_like(out_Ta, np.nan)
+    for ch in range(1, 7):
+        Ta = IRDR_data_pj[f"Ch{ch}"]    # antenna temperature
+        if ch == 1:
+            alphas, alphas_eq, lons = alphas1, alphas_eq1, lons1
+            Ta = Ta[mask1]
+        else:   # I do filtering outside of this loop so I don't redo work for each ch > 1
+            alphas, alphas_eq, lons = alphas2, alphas_eq2, lons2
+            Ta = Ta[mask2]
+        assert Ta.shape == alphas_eq.shape == lons.shape, "Ta, alphas, and lons must have same shape!"
+
+        binned_Ta_medians = bin_data(Ta, lons, alphas_eq, num_lons, num_alphas)             # this should drop values if lons or alphas_eq are nan
+        binned_alpha_medians = bin_data(alphas, lons, alphas_eq, num_lons, num_alphas)      # track which measurement comes from which local pitch angle
+        out_Ta[ch-1, :, :] = binned_Ta_medians.T                                            # binned_statistic maps x to rows, need x as cols for imshow
+        out_alpha[ch-1 :, :] = binned_alpha_medians.T
+    return out_Ta, out_alpha
+
+
+def mshell_argparser(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument("--dt", required=True, type=float, help="Delta time around each perijove in minutes")
     parser.add_argument("--ch", required=False, type=str, default="1,2,3,4,5,6", help="List of channels separated by comma")
     parser.add_argument("--PJs", required=True, type=str, help="Perijove range (e.g. 1,2,5,6 or 1-7 or 1,3-6)")
     parser.add_argument("--M", required=True, type=str, help="M-shell")
     parser.add_argument('-f', "--mesh-file", required=True, type=str, help="npz file containing mesh information")
-    args = parser.parse_args()
+    return parser
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    args = mshell_argparser(parser).parse_args()
 
     # input validation
     chs = np.array([int(ch) for ch in args.ch.split(',')])
@@ -182,16 +267,7 @@ def main():
     for pj in pjs: assert pj in range(1, 78), "Valid perijoves numbers are 1-77"
     Ms = np.array([float(M) for M in args.M.split(',')])
 
-    # construct RegularGridInterpolators for each mesh value
-    mesh_data = np.load(args.mesh_file)
-    x_vec = mesh_data["x_vec"]
-    y_vec = mesh_data["y_vec"]
-    z_vec = mesh_data["z_vec"]
-    points = (x_vec, y_vec, z_vec)
-    UGLI_B =   UGLI(points=points, values=mesh_data["B_mesh"])
-    UGLI_Beq = UGLI(points=points, values=mesh_data["B_mesh_eq"])
-    UGLI_M =   UGLI(points=points, values=mesh_data["Mshell"])
-    UGLI_lonxy = UGLI(points=points, values=mesh_data["dipole_xy"])
+    MI = MeshInterpolator(args.mesh_file)
 
     for M in Ms:
         save_path = f"{IM_PATH}/{M}"
@@ -204,54 +280,13 @@ def main():
             print(f"Loading PJ {pj}")
             try:
                 IRDR_data_pj, GRDR_data_pj = load_PJ_data(pj, args.dt, chs, keep_cols_GRDR=COLS_GRDR)
-            except (NoProductsError, FileDownloadError, DownloadShortCircuitError, BadPJError) as err:
+            except PDSError:
                 print(f"Skipping PJ: {pj}")
                 skipped_PJs.append(pj)
                 continue
-            # grab relevant columns
-            Jn_SIII = GRDR_data_pj[['S3RH_x_JcJn', 'S3RH_y_JcJn', 'S3RH_z_JcJn']].to_numpy(dtype=np.float32) / RJ   # normalized to Jupiter radius
-            boresight_SIII_1 = GRDR_data_pj[['S3RH_x_B1', 'S3RH_y_B1', 'S3RH_z_B1']].to_numpy(dtype=np.float32)     # normalized
-            boresight_SIII_2 = GRDR_data_pj[['S3RH_x_B2', 'S3RH_y_B2', 'S3RH_z_B2']].to_numpy(dtype=np.float32)     # normalized
-
-            print("Filtering")
-            pos_mask = mask_M(Jn_SIII, UGLI_M, M)
-            jupiter_mask_ch1 = mask_jupiter(GRDR_data_pj["PC_lon_JsB1"].to_numpy())
-            jupiter_mask_ch2 = mask_jupiter(GRDR_data_pj["PC_lon_JsB2"].to_numpy())
-            mask1 = np.logical_and(~jupiter_mask_ch1, pos_mask)
-            mask2 = np.logical_and(~jupiter_mask_ch2, pos_mask)
-            Jn_SIII_ch1 = Jn_SIII[mask1, :]                         # mask positions
-            boresight_SIII_1 = boresight_SIII_1[mask1, :]           # mask boresights
-            Jn_SIII_ch2 = Jn_SIII[mask2, :]                         # mask positions
-            boresight_SIII_2 = boresight_SIII_2[mask2, :]           # mask boresights
-
-            print("Calculating intersections")
-            if 1 in chs:
-                r_los1 = r_los(r_sc=Jn_SIII_ch1, r_b=boresight_SIII_1, smin=0.2, smax=7, sN=100)
-                alphas1, alphas_eq1, lons1, r_los_mask1 = intersect_alphas_lons(r_los=r_los1, r_b=boresight_SIII_1,
-                                                                         UGLI_M=UGLI_M, UGLI_B=UGLI_B, UGLI_Beq=UGLI_Beq, UGLI_lonxy=UGLI_lonxy,
-                                                                         M=M, dM=0.05)
-            if (len(chs) == 1 and chs[0] != 1) or len(chs) > 1:
-                r_los2 = r_los(r_sc=Jn_SIII_ch2, r_b=boresight_SIII_2, smin=0.2, smax=7, sN=100)
-                alphas2, alphas_eq2, lons2, r_los_mask2 = intersect_alphas_lons(r_los=r_los2, r_b=boresight_SIII_2,
-                                                                         UGLI_M=UGLI_M, UGLI_B=UGLI_B, UGLI_Beq=UGLI_Beq, UGLI_lonxy=UGLI_lonxy,
-                                                                         M=M, dM=0.05)
-            print("Binning")
-            for ch in chs:
-                Ta = IRDR_data_pj[f"Ch{ch}"]    # antenna temperature
-                if ch == 1:
-                    alphas, alphas_eq, lons = alphas1, alphas_eq1, lons1
-                    np.savez(f"npz/MWR_plottables_M{M}_PJ{pj}_CH{1}.npz", r_sc=Jn_SIII_ch1, r_b=boresight_SIII_1, r_los=r_los1, r_los_mask=r_los_mask1)
-                    Ta = Ta[mask1]
-                else:   # I do filtering outside of this loop so I don't redo work for each ch > 1
-                    alphas, alphas_eq, lons = alphas2, alphas_eq2, lons2
-                    np.savez(f"npz/MWR_plottables_M{M}_PJ{pj}_CH{2}.npz", r_sc=Jn_SIII_ch2, r_b=boresight_SIII_2, r_los=r_los2, r_los_mask=r_los_mask2)
-                    Ta = Ta[mask2]
-                assert Ta.shape == alphas_eq.shape == lons.shape, "Ta, alphas, and lons must have same shape!"
-
-                binned_Ta_medians = bin_data(Ta, lons, alphas_eq)   # this should drop values if lons or alphas_eq are nan
-                series_Ta[ch-1, :, :, i] = binned_Ta_medians.T   # binned_statistic maps x to rows
-                binned_alpha_medians = bin_data(alphas, lons, alphas_eq)    # track which measurement comes from which local pitch angle
-                series_alpha[ch-1, :, :, i] = binned_alpha_medians.T
+            mapped_Ta_pj, mapped_alpha_pj = map_Ta_to_M(IRDR_data_pj=IRDR_data_pj, GRDR_data_pj=GRDR_data_pj, M=M, pj=pj, MI=MI)
+            series_Ta[..., i] = mapped_Ta_pj
+            series_alpha[..., i] = mapped_alpha_pj
         print(f"Data compilation finished. Skipped PJs: {skipped_PJs}")
 
         params_str = f"PJs{args.PJs}_CHs{args.ch}_M{M}_dt{args.dt}"
