@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from coordinates import get_PJ_time_ET
 from banana_slug import make_subplots
 from PDS_helper import load_PJ_data
+from global_vars import process_ch_inputs
 
 # default
 import argparse
