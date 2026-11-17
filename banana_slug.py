@@ -128,7 +128,7 @@ def plot_contours(ax: Axes, lat_folded: np.ndarray, lon_folded: np.ndarray):
     num_spins, samples_per_rot = lat_folded.shape
     x = np.arange(samples_per_rot)
     y = np.arange(num_spins)
-    X, Y = np.meshgrid(x, y)    # set up image grid
+    X, Y = np.meshgrid(x, y, indexing='xy')    # set up image grid
     lat_contours = ax.contour(X, Y, lat_folded, levels=range(-90, 91, 30), colors='white', linestyles='solid', negative_linestyles='dotted')
     ax.clabel(lat_contours, inline=True, fmt='%.0f')
     # long contours use levels outside [0, 360) since data is phase unwrapped
