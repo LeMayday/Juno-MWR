@@ -8,7 +8,7 @@ import requests
 
 # local files
 from coordinates import get_tmin_tmax, lat_lonE, lat_lonW, lat_lon_to_pos
-from global_vars import RJ, ONE_D_NDArray, TWO_D_NDArray
+from global_vars import RJ, ONE_D_NDArray, TWO_D_NDArray, CHS
 
 # default
 from datetime import datetime
@@ -169,14 +169,14 @@ def download_clean_data(PDS_data_df: pd.DataFrame, pj: int) -> pd.DataFrame:
     return sorted_filepaths_df
 
 
-def load_PJ_data(pj: int, dt: float, chs: np.ndarray, keep_cols_GRDR: list[str] = COLS_GRDR, force_query: bool = False) -> tuple[pd.DataFrame, pd.DataFrame]:
+def load_PJ_data(pj: int, dt: float, CHS: list[CHS], keep_cols_GRDR: list[str] = COLS_GRDR, force_query: bool = False) -> tuple[pd.DataFrame, pd.DataFrame]:
     if pj in BAD_PJS:
         raise BadPJError
     t_min, t_max = get_tmin_tmax(pj, dt)                                    # PDS queries by time range
     filepaths_df = PDS_query_short_circuit(t_min, t_max, pj, force_query)   # get list of filepaths
     
     # read only the columns pertinent to this processing (e.g. channel specific -- does not change csv)
-    keep_cols_IRDR = ['t_ephem_time', 't_utc_doy', *CHANNELS[chs - 1].tolist()]
+    keep_cols_IRDR = ['t_ephem_time', 't_utc_doy', *CHANNELS[CHS].tolist()]
     
     # read and truncate the data by time and selected columns
     dfs = [[], []]
@@ -194,7 +194,7 @@ def load_PJ_data(pj: int, dt: float, chs: np.ndarray, keep_cols_GRDR: list[str] 
     GRDR_data_pj = pd.concat(dfs[1], ignore_index=True)
     IRDR_data_pj = IRDR_data_pj.rename(columns={'t_ephem_time': 'Time_ET', 't_utc_doy': 'Time_UTC'})
     GRDR_data_pj = GRDR_data_pj.rename(columns={'t_ephem_time': 'Time_ET', 't_utc_doy': 'Time_UTC'})
-    IRDR_data_pj = IRDR_data_pj.rename(columns={str(CHANNELS[ch - 1]): f"Ch{ch}" for ch in chs})
+    IRDR_data_pj = IRDR_data_pj.rename(columns={str(CHANNELS[CH]): CH.name for CH in CHS})
 
     # # transform lat/lon data to x,y,z since interpolation requires continuous fields
     # for lat_col in GRDR_data_pj.columns:
@@ -208,23 +208,26 @@ def load_PJ_data(pj: int, dt: float, chs: np.ndarray, keep_cols_GRDR: list[str] 
     return IRDR_data_pj, GRDR_data_pj
 
 
-def get_SIII_lat_lon(GRDR_data_pj: pd.DataFrame, ch: int) -> tuple[np.ndarray, np.ndarray]:
-    if ch in range(2, 7): ch = 2
-    columns_to_select = [f'S3RH_x_B{ch}', f'S3RH_y_B{ch}', f'S3RH_z_B{ch}']
+def get_SIII_lat_lon(GRDR_data_pj: pd.DataFrame, CH: CHS) -> tuple[np.ndarray, np.ndarray]:
+    if CH > CHS.CH2: CH = CHS.CH2
+    CH = CH + 1     # enum is 0-indexed
+    columns_to_select = [f'S3RH_x_B{CH}', f'S3RH_y_B{CH}', f'S3RH_z_B{CH}']
     data_x, data_y, data_z = np.hsplit(GRDR_data_pj[columns_to_select].to_numpy(), 3)
     return lat_lonW(data_x, data_y, data_z)
 
 
-def get_VIP4_lat_lon(GRDR_data_pj: pd.DataFrame, ch: int) -> tuple[np.ndarray, np.ndarray]:
-    if ch in range(2, 7): ch = 2
-    columns_to_select = [f'JMag_x_B{ch}', f'JMag_y_B{ch}', f'JMag_z_B{ch}']
+def get_VIP4_lat_lon(GRDR_data_pj: pd.DataFrame, CH: CHS) -> tuple[np.ndarray, np.ndarray]:
+    if CH > CHS.CH2: CH = CHS.CH2
+    CH = CH + 1     # enum is 0-indexed
+    columns_to_select = [f'JMag_x_B{CH}', f'JMag_y_B{CH}', f'JMag_z_B{CH}']
     data_x, data_y, data_z = np.hsplit(GRDR_data_pj[columns_to_select].to_numpy(), 3)
     return lat_lonE(data_x, data_y, data_z)
 
 
-def get_PC_lat_lon(GRDR_data_pj: pd.DataFrame, ch: int) -> tuple[np.ndarray, np.ndarray]:
-    if ch in range(2, 7): ch = 2
-    columns_to_select = [f'PC_x_JsB{ch}', f'PC_y_JsB{ch}', f'PC_z_JsB{ch}']
+def get_PC_lat_lon(GRDR_data_pj: pd.DataFrame, CH: CHS) -> tuple[np.ndarray, np.ndarray]:
+    if CH > CHS.CH2: CH = CHS.CH2
+    CH = CH + 1     # enum is 0-indexed
+    columns_to_select = [f'PC_x_JsB{CH}', f'PC_y_JsB{CH}', f'PC_z_JsB{CH}']
     data_x, data_y, data_z = np.hsplit(GRDR_data_pj[columns_to_select].to_numpy(), 3)
     return lat_lonE(data_x, data_y, data_z)
 

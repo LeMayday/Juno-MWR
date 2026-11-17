@@ -37,10 +37,9 @@ def time_series_argparser(parser: argparse.ArgumentParser):
 def main():
     parser = argparse.ArgumentParser()
     args = time_series_argparser(parser).parse_args()
-    chs = np.array([int(ch) for ch in args.ch.split(',')])
-    for ch in chs: assert ch in range(1, 7), "Valid channel numbers are 1-6"    # validate channel inputs
+    chs = process_ch_inputs(args.ch)
     
-    IRDR_data_pj, _ = load_PJ_data(args.PJ, args.dt, np.array(chs))
+    IRDR_data_pj, _ = load_PJ_data(args.PJ, args.dt, chs)
     time_series_plot(IRDR_data_pj, args.PJ)
 
 

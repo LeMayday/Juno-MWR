@@ -8,7 +8,7 @@ from unwrap import unwrap
 
 # local files
 from PDS_helper import COLS_GRDR, load_PJ_data, get_SIII_lat_lon, get_VIP4_lat_lon, get_PC_lat_lon
-from global_vars import VMAX
+from global_vars import process_ch_inputs, CHS, VMAX
 
 # default
 import argparse
@@ -42,10 +42,11 @@ def fill_missing_data(data: pd.DataFrame) -> pd.DataFrame:
     return data_full
 
 
-def channel_jupiter_2Dmask(ch: int, GRDR_data_pj: pd.DataFrame, samples_per_rot: int, num_spins: int) -> np.ndarray:
+def channel_jupiter_2Dmask(CH: CHS, GRDR_data_pj: pd.DataFrame, samples_per_rot: int, num_spins: int) -> np.ndarray:
     # planetocentric lat/long of antenna boresight surface intercept seems to be only provided when antenna is looking at Jupiter
-    if ch in range(2, 7): ch = 2
-    columns_to_select = [col for col in COLS_GRDR if 'PC_lon_Js' in col and f'B{ch}' in col]
+    if CH > CHS.CH2: CH = CHS.CH2
+    CH = CH + 1
+    columns_to_select = [col for col in COLS_GRDR if 'PC_lon_Js' in col and f'B{CH}' in col]
     data = GRDR_data_pj[columns_to_select].to_numpy()
     mask = ~np.isnan(data)
     mask_folded = mask[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)
@@ -92,15 +93,15 @@ def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame, samples_
     fig.savefig(f"{IM_PATH}/MWR_banana_{params_str}_{overlay_type}.png", dpi=300)
 
 
-def add_contours(ax: Axes, ch: int, GRDR_data_pj: pd.DataFrame, samples_per_rot: int, num_spins: int, type: Optional[str]):
+def add_contours(ax: Axes, CH: CHS, GRDR_data_pj: pd.DataFrame, samples_per_rot: int, num_spins: int, type: Optional[str]):
     # valid types: SIII, SIII_NJ, VIP4, VIP4_NJ
     if type is None:
         return
     bkgd_lat = None; bkgd_lon = None; frgd_lat = None; frgd_lon = None
     if 'SIII' in type:
-        bkgd_lat, bkgd_lon = get_SIII_lat_lon(GRDR_data_pj, ch)
+        bkgd_lat, bkgd_lon = get_SIII_lat_lon(GRDR_data_pj, CH)
     elif 'VIP4' in type:
-        bkgd_lat, bkgd_lon = get_VIP4_lat_lon(GRDR_data_pj, ch)
+        bkgd_lat, bkgd_lon = get_VIP4_lat_lon(GRDR_data_pj, CH)
     # if 'PC' in type:
     #     frgd_lat, frgd_lon = get_PC_lat_lon(GRDR_data_pj, ch)
     # options are bkgd no frgd, bkgd no jupiter, bkgd w frgd, frgd no bkgd
@@ -109,7 +110,7 @@ def add_contours(ax: Axes, ch: int, GRDR_data_pj: pd.DataFrame, samples_per_rot:
         bkgd_lon_folded = bkgd_lon[:(num_spins * samples_per_rot)].reshape(-1, samples_per_rot)
         bkgd_lon_folded = np.rad2deg(unwrap(np.deg2rad(bkgd_lon_folded)))                           # 2D phase unwraping to ensure continuous contours
         if frgd_lat is not None or 'NJ' in type:
-            jupiter_mask = channel_jupiter_2Dmask(ch, GRDR_data_pj, samples_per_rot, num_spins)     # could also get this from frgd data?
+            jupiter_mask = channel_jupiter_2Dmask(CH, GRDR_data_pj, samples_per_rot, num_spins)     # could also get this from frgd data?
             bkgd_lat_folded[jupiter_mask] = np.nan
             bkgd_lon_folded[jupiter_mask] = np.nan
         plot_contours(ax, bkgd_lat_folded, bkgd_lon_folded)
@@ -147,10 +148,9 @@ def banana_argparser(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
 def main():
     parser = argparse.ArgumentParser()
     args = banana_argparser(parser).parse_args()
-    chs = np.array([int(ch) for ch in args.ch.split(',')])
-    for ch in chs: assert ch in range(1, 7), "Valid channel numbers are 1-6"    # validate channel inputs
+    chs = process_ch_inputs(args.ch)
 
-    IRDR_data_pj, GRDR_data_pj = load_PJ_data(args.PJ, args.dt, np.array(chs))
+    IRDR_data_pj, GRDR_data_pj = load_PJ_data(args.PJ, args.dt, chs)
     banana_plot(IRDR_data_pj, GRDR_data_pj, args.dspr, f"PJs{args.PJ}_CHs{args.ch}_dt{args.dt}", args.type)
 
 
