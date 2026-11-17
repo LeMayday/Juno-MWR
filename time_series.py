@@ -14,14 +14,18 @@ import argparse
 
 
 def time_series_plot(IRDR_data_pj: pd.DataFrame, pj: int):
-    IRDR_data_pj = IRDR_data_pj.iloc[::10]  # downsampled to 1/s
+    time_series_plot_np(IRDR_data_pj=IRDR_data_pj.to_numpy(), chs=IRDR_data_pj.columns[2:], pj=pj)
+
+
+def time_series_plot_np(IRDR_data_pj: np.ndarray, chs: list[str], pj: int):
+    IRDR_data_pj = IRDR_data_pj[::10]                       # downsampled to 1/s
     pj_time = get_PJ_time_ET(pj)
-    minutes_delta = (IRDR_data_pj['Time_ET'].to_numpy() - pj_time) / 60
+    minutes_delta = (IRDR_data_pj[:, 0] - pj_time) / 60     # ['Time_ET'] is 0th column
 
     fig = plt.figure(figsize=(12,8))
-    axes = make_subplots(fig, len(IRDR_data_pj.columns[2:]))
-    for i, ch in enumerate(IRDR_data_pj.columns[2:]):   # skip time column
-        axes[i].plot(minutes_delta, IRDR_data_pj[ch].to_numpy(), label=ch)
+    axes = make_subplots(fig, IRDR_data_pj.shape[1] - 2)    # all but time columns
+    for i, ch in enumerate(chs):
+        axes[i].plot(minutes_delta, IRDR_data_pj[:, i + 2], label=ch)
         axes[i].axvline(x=0, ls='--', c='k')
         axes[i].set_title(ch)
     fig.tight_layout()
