@@ -32,17 +32,16 @@ TABLE_1 = np.array([[1.0, 50,   6.0,   28.0],
 
 
 def table1_lookup(L_los: TWO_D_NDArray) -> THREE_D_NDArray:
-    L_los[(L_los > 1.36) & (L_los <= 1.44)] = 0
-    L_los[(L_los > 1.44) & (L_los <= 1.78)] = 1
-    L_los[(L_los > 1.78) & (L_los <= 2.00)] = 2
-    L_los[(L_los > 2.00) & (L_los <= 2.24)] = 3
-    L_los[(L_los > 2.24) & (L_los <= 2.48)] = 4
-    L_los[(L_los > 2.48) & (L_los <= 2.80)] = 5
-    L_los[(L_los > 2.80) & (L_los <= 3.30)] = 6
-    L_los[(L_los > 3.30) & (L_los <= 3.90)] = 7
-    L_los[(L_los <= 1.36) | (L_los > 3.90)] = 8     # populate out of bounds with nan
-    L_los[~np.isfinite(L_los)] = 8                  # populate nonfinite values with nan
-    return TABLE_1[L_los]   # should be N x M x 4
+    lookup = np.full_like(L_los, -1, dtype=int)     # populate out of bounds / nonfinite values with nan
+    lookup[(L_los > 1.36) & (L_los <= 1.44)] = 0
+    lookup[(L_los > 1.44) & (L_los <= 1.78)] = 1
+    lookup[(L_los > 1.78) & (L_los <= 2.00)] = 2
+    lookup[(L_los > 2.00) & (L_los <= 2.24)] = 3
+    lookup[(L_los > 2.24) & (L_los <= 2.48)] = 4
+    lookup[(L_los > 2.48) & (L_los <= 2.80)] = 5
+    lookup[(L_los > 2.80) & (L_los <= 3.30)] = 6
+    lookup[(L_los > 3.30) & (L_los <= 3.90)] = 7
+    return TABLE_1[lookup]   # should be N x M x 4
 
 
 def gamma(E: np.ndarray) -> np.ndarray:
