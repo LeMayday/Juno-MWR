@@ -71,8 +71,8 @@ def batch_equator(R: FOUR_D_NDArray) -> FOUR_D_NDArray:
     out_flat[:, IDX.YIN] = Tion.yn3
     out_flat[:, IDX.ZIN] = Tion.zn3
     out_flat[:, IDX.XIS] = Tion.xs3
-    out_flat[:, IDX.YIS] = Tion.xs3
-    out_flat[:, IDX.ZIS] = Tion.xs3
+    out_flat[:, IDX.YIS] = Tion.ys3
+    out_flat[:, IDX.ZIS] = Tion.zs3
     out_flat[:, IDX.MSH] = Teq.mshell
     out_flat[:, IDX.XEM] = Teq.xm
     out_flat[:, IDX.YEM] = Teq.ym
