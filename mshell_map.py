@@ -11,7 +11,7 @@ from banana_slug import make_subplots
 from PDS_helper import load_PJ_data, get_Juno_pos_RJ, get_boresight_dir, PDSError
 from synchrotron_map import parse_PJs, stack_data
 from coordinates import lat_lonE
-from global_vars import ONE_D_NDArray, TWO_D_NDArray, THREE_D_NDArray, VMAX
+from global_vars import process_ch_inputs, CHS, ONE_D_NDArray, TWO_D_NDArray, THREE_D_NDArray, VMAX
 
 # default
 import argparse
@@ -172,7 +172,7 @@ def bin_data(values: ONE_D_NDArray, lons: ONE_D_NDArray, alphas: ONE_D_NDArray, 
     return med
 
 
-def plot_data(data: THREE_D_NDArray, chs: list, params_str: str, vmax: list = None, BLC_file: str = None, save_path: str = IM_PATH):
+def plot_data(data: THREE_D_NDArray, CHS: list[CHS], params_str: str, vmax: list = None, BLC_file: str = None, save_path: str = IM_PATH):
     fig = plt.figure(figsize=(18,8))
     axes = make_subplots(fig, data.shape[0])
     for i, ax in enumerate(axes):
@@ -189,7 +189,7 @@ def plot_data(data: THREE_D_NDArray, chs: list, params_str: str, vmax: list = No
             ax.plot(lons, BLC_N, linestyle='-')
             ax.plot(lons, BLC_S, linestyle='--')
             ax.axhline(np.max(BLC_data[:, 1:]), linestyle='dotted')
-        ax.set_title(f"Ch{chs[i]}")
+        ax.set_title(f"{CHS[i].name}")
         ax.set_xlabel("JRM33 Dipole Longitude")
         ax.set_ylabel("$\\alpha_{eq}$")
     fig.tight_layout()
@@ -197,16 +197,16 @@ def plot_data(data: THREE_D_NDArray, chs: list, params_str: str, vmax: list = No
     plt.close(fig)
 
 
-def geometry_mask(GRDR_data_pj: DataFrame, UGLI_M: UGLI, M: float, CH: Literal[1, 2]) -> ONE_D_NDArray:
+def geometry_mask(GRDR_data_pj: DataFrame, UGLI_M: UGLI, M: float, CH: Literal[CHS.CH1, CHS.CH2]) -> ONE_D_NDArray:
     Jn_SIII = get_Juno_pos_RJ(GRDR_data_pj)
     lat_mask = mask_lat(Jn_SIII)                    # mask for near the equator
     pos_mask = mask_M(Jn_SIII, UGLI_M, M)           # mask for within mshell
     pos_mask = np.logical_and(pos_mask, lat_mask)
-    jupiter_mask = mask_jupiter(GRDR_data_pj[f"PC_lon_JsB{CH}"].to_numpy())     # mask where looking at jupiter
+    jupiter_mask = mask_jupiter(GRDR_data_pj[f"PC_lon_JsB{CH+1}"].to_numpy())   # mask where looking at jupiter
     return np.logical_and(~jupiter_mask, pos_mask)
 
 
-def geometry_intersections(GRDR_data_pj: DataFrame, mask: ONE_D_NDArray, M: float, CH: Literal[1, 2],
+def geometry_intersections(GRDR_data_pj: DataFrame, mask: ONE_D_NDArray, M: float, CH: Literal[CHS.CH1, CHS.CH2],
                            MI: MeshInterpolator, save_params: str = None) -> tuple[ONE_D_NDArray, ONE_D_NDArray, ONE_D_NDArray]:
     # grab relevant columns
     Jn_SIII = get_Juno_pos_RJ(GRDR_data_pj)
@@ -224,15 +224,15 @@ def geometry_intersections(GRDR_data_pj: DataFrame, mask: ONE_D_NDArray, M: floa
 def map_Ta_to_M(IRDR_data_pj: DataFrame, GRDR_data_pj: DataFrame, M: float, pj: int,
                 MI: MeshInterpolator, num_lons: int = 180, num_alphas: int = 90) -> tuple[THREE_D_NDArray, THREE_D_NDArray]:
     print("Calculating intersections")
-    mask1 = geometry_mask(GRDR_data_pj=GRDR_data_pj, UGLI_M=MI.M, M=M, CH=1)
-    mask2 = geometry_mask(GRDR_data_pj=GRDR_data_pj, UGLI_M=MI.M, M=M, CH=2)
-    alphas1, alphas_eq1, lons1 = geometry_intersections(GRDR_data_pj=GRDR_data_pj, mask=mask1, M=M, CH=1, MI=MI, save_params=f"M{M}_PJ{pj}_CH{1}")
-    alphas2, alphas_eq2, lons2 = geometry_intersections(GRDR_data_pj=GRDR_data_pj, mask=mask2, M=M, CH=2, MI=MI, save_params=f"M{M}_PJ{pj}_CH{1}")
+    mask1 = geometry_mask(GRDR_data_pj=GRDR_data_pj, UGLI_M=MI.M, M=M, CH=CHS.CH1)
+    mask2 = geometry_mask(GRDR_data_pj=GRDR_data_pj, UGLI_M=MI.M, M=M, CH=CHS.CH2)
+    alphas1, alphas_eq1, lons1 = geometry_intersections(GRDR_data_pj=GRDR_data_pj, mask=mask1, M=M, CH=CHS.CH1, MI=MI, save_params=f"M{M}_PJ{pj}_CH{1}")
+    alphas2, alphas_eq2, lons2 = geometry_intersections(GRDR_data_pj=GRDR_data_pj, mask=mask2, M=M, CH=CHS.CH2, MI=MI, save_params=f"M{M}_PJ{pj}_CH{2}")
     out_Ta = np.full((6, num_alphas, num_lons), np.nan)
     out_alpha = np.full_like(out_Ta, np.nan)
-    for ch in range(1, 7):
-        Ta = IRDR_data_pj[f"Ch{ch}"]    # antenna temperature
-        if ch == 1:
+    for CH in CHS:
+        Ta = IRDR_data_pj[CH.name]    # antenna temperature
+        if CH == CHS.CH1:
             alphas, alphas_eq, lons = alphas1, alphas_eq1, lons1
             Ta = Ta[mask1]
         else:   # I do filtering outside of this loop so I don't redo work for each ch > 1
@@ -242,8 +242,8 @@ def map_Ta_to_M(IRDR_data_pj: DataFrame, GRDR_data_pj: DataFrame, M: float, pj: 
 
         binned_Ta_medians = bin_data(Ta, lons, alphas_eq, num_lons, num_alphas)             # this should drop values if lons or alphas_eq are nan
         binned_alpha_medians = bin_data(alphas, lons, alphas_eq, num_lons, num_alphas)      # track which measurement comes from which local pitch angle
-        out_Ta[ch-1, :, :] = binned_Ta_medians.T                                            # binned_statistic maps x to rows, need x as cols for imshow
-        out_alpha[ch-1 :, :] = binned_alpha_medians.T
+        out_Ta[CH, :, :] = binned_Ta_medians.T                                              # binned_statistic maps x to rows, need x as cols for imshow
+        out_alpha[CH :, :] = binned_alpha_medians.T
     return out_Ta, out_alpha
 
 
@@ -261,8 +261,7 @@ def main():
     args = mshell_argparser(parser).parse_args()
 
     # input validation
-    chs = np.array([int(ch) for ch in args.ch.split(',')])
-    for ch in chs: assert ch in range(1, 7), "Valid channel numbers are 1-6"
+    chs = process_ch_inputs(args.ch)
     pjs = parse_PJs(args.PJs)
     for pj in pjs: assert pj in range(1, 78), "Valid perijoves numbers are 1-77"
     Ms = np.array([float(M) for M in args.M.split(',')])
@@ -304,7 +303,7 @@ def main():
         np.save(f"npy/MWR_alpha_stacked_{params_str}.npy", stacked_alpha_data)
 
         BLC_file = f"BLC_M{int(M)}.txt" if M in [2, 3, 5, 10] else None
-        plot_data(stacked_Ta_data, chs, f"Ta_series_{params_str}", vmax=VMAX[chs - 1], BLC_file=BLC_file, save_path=save_path)
+        plot_data(stacked_Ta_data, chs, f"Ta_series_{params_str}", vmax=VMAX[chs], BLC_file=BLC_file, save_path=save_path)
         plot_data(stacked_alpha_data, chs, f"alpha_series_{params_str}", save_path=save_path)
 
 
