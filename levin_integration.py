@@ -161,10 +161,35 @@ def imitate_IRDR(GRDR_data_pj: pd.DataFrame, MI: MeshInterpolator, E_range: ONE_
     return pd.DataFrame(np.concatenate((time_data, Ta_data), axis=1), columns=(['Time_ET', 'Time_UTC'] + [CH.name for CH in CHS]))
 
 
+def recreate_VLA(MI: MeshInterpolator, E_range: ONE_D_NDArray, Ny: int, Nz: int, Ns: int):
+    smin = 0.2; smax = 9
+    s_range = np.linspace(smin, smax, Ns + 1)
+    y = np.linspace(-5, 5, Ny + 1)
+    z = np.linspace(-5, 5, Nz + 1)
+    Y, Z = np.meshgrid(y, z, indexing='xy')
+    cam_pos = np.stack((np.full_like(Y, 4.5), Y, Z), axis=-1)       # points along y-z plane at x = 9.5
+    cam_pos = cam_pos.reshape(-1, cam_pos.shape[-1])
+    cam_dir = np.zeros_like(cam_pos)
+    cam_dir[:, 0] = -1                                              # looking in -x direction
+    r_los = make_Rlos(r_sc=cam_pos, r_b=cam_dir, smin=smin, smax=smax, sN=Ns)
+    Ta_VLA = los_integrate(r_los=r_los, r_b=cam_dir, MI=MI, E_range=E_range, s_range=s_range, CH=CHS.VLA1)
+
+    import matplotlib.pyplot as plt
+    fig = plt.figure(figsize=[8,6])
+    ax = fig.add_subplot(111)
+    im = ax.imshow(Ta_VLA.reshape(Ny + 1, Nz + 1), cmap='jet', aspect='auto', origin='lower', extent=[-5, 5, -5, 5])
+    fig.colorbar(im, ax=ax)
+    ax.set_xlabel("y")
+    ax.set_ylabel("z")
+    fig.tight_layout()
+    plt.show()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', "--mesh-file", required=True, type=str, help="npz file containing mesh information")
     subparsers = parser.add_subparsers(dest="analysis", required=True)
+    subparsers.add_parser("VLA", help="Make VLA-like plot for debugging")
     time_parser = subparsers.add_parser("time", help="Make time series plot")
     time_series_argparser(time_parser)
     banana_parser = subparsers.add_parser("banana", help="Make banana plot")
@@ -174,11 +199,14 @@ def main():
     mshell_parser.set_defaults(mesh_file=argparse.SUPPRESS)
     args = parser.parse_args()
 
-    chs = process_ch_inputs(args.ch)
+    if args.analysis != "VLA":
+        chs = process_ch_inputs(args.ch)
     MI = MeshInterpolator(args.mesh_file)
     E_range = np.linspace(0.1, 50, 51)
 
-    if args.analysis == "time":
+    if args.analysis == "VLA":
+        recreate_VLA(MI=MI, E_range=E_range, Ny=100, Nz=100, Ns=100)
+    elif args.analysis == "time":
         _, GRDR_data_pj = load_PJ_data(args.PJ, args.dt, chs)
         IRDR_data_pj = imitate_IRDR(GRDR_data_pj=GRDR_data_pj, MI=MI, E_range=E_range, sN=50)
         time_series_plot(IRDR_data_pj, args.PJ)
