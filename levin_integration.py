@@ -52,7 +52,7 @@ def gamma(E: np.ndarray) -> np.ndarray:
     return E / 0.511 + 1
 
 
-def N(alpha: TWO_D_NDArray, B: TWO_D_NDArray, Beq: TWO_D_NDArray, E_range: ONE_D_NDArray) -> THREE_D_NDArray:
+def N(alpha: TWO_D_NDArray, B_Gauss: TWO_D_NDArray, Beq_Gauss: TWO_D_NDArray, E_range: ONE_D_NDArray) -> THREE_D_NDArray:
     """
     Number density (assume cm^-3) per unit energy per unit pitch angle --- eqns 8-11
 
@@ -64,11 +64,11 @@ def N(alpha: TWO_D_NDArray, B: TWO_D_NDArray, Beq: TWO_D_NDArray, E_range: ONE_D
 
     E_range: range of energies over which to integrate (MeV)
     """
-    a_eq = alpha_eq(alpha, Beq, B)                  # num samples x num LOS pts
-    L = (MJ / Beq)**(1/3)                           # eqn 9 --- num samples x num LOS pts
+    a_eq = alpha_eq(alpha, Beq_Gauss, B_Gauss)      # num samples x num LOS pts
+    L = (MJ / Beq_Gauss)**(1/3)                     # eqn 9 --- num samples x num LOS pts
     mp = table1_lookup(L)                           # model params
-    n_ea = mp[..., 2] * np.sin(a_eq)**(mp[..., 0]) + mp[..., 3] * np.sin(a_eq)**(mp[..., 1])    # eqn 10 --- num samples x num LOS pts
-    n_eE = E0 / ( E0 + ( E_range[None, None, :] / np.sqrt(B)[:, :, None] )**(EPS + 0.75) )      # eqn 11 --- num samples x num LOS pts x num E pts
+    n_ea = mp[..., 2] * np.sin(a_eq)**(mp[..., 0]) + mp[..., 3] * np.sin(a_eq)**(mp[..., 1])        # eqn 10 --- num samples x num LOS pts
+    n_eE = E0 / ( E0 + ( E_range[None, None, :] / np.sqrt(B_Gauss)[:, :, None] )**(EPS + 0.75) )    # eqn 11 --- num samples x num LOS pts x num E pts
     return n_ea[:, :, None] * n_eE
 
 
@@ -112,13 +112,13 @@ def T(I_C: TWO_D_NDArray, CH: CHS) -> TWO_D_NDArray:
 
 
 def los_integrate(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray, MI: MeshInterpolator, E_range: ONE_D_NDArray, s_range: ONE_D_NDArray, CH: CHS) -> ONE_D_NDArray:
-    B_los = MI.B(r_los)
+    B_los = MI.B(r_los) * nT_to_Gauss
     B_los_norm = norm(B_los, axis=-1)
-    Beq_los = MI.Beq(r_los)
+    Beq_los = MI.Beq(r_los) * nT_to_Gauss
     Beq_los_norm = norm(Beq_los, axis=-1)
-    Bin_los = MI.Bin(r_los)
+    Bin_los = MI.Bin(r_los) * nT_to_Gauss
     Bin_los_norm = norm(Bin_los, axis=-1)
-    Bis_los = MI.Bis(r_los)
+    Bis_los = MI.Bis(r_los) * nT_to_Gauss
     Bis_los_norm = norm(Bis_los, axis=-1)
 
     alpha_los = alpha(r_b, B_los)
@@ -127,7 +127,7 @@ def los_integrate(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray, MI: MeshInterpolat
     B_mirror = B_los_norm / sin_alpha**2
     loss_cone_mask = B_mirror > np.minimum(Bin_los_norm, Bis_los_norm)      # perhaps not valid if not dipole?
 
-    n_e = N(alpha=alpha_los, B=B_los_norm, Beq=Beq_los_norm, E_range=E_range)
+    n_e = N(alpha=alpha_los, B_Gauss=B_los_norm, Beq_Gauss=Beq_los_norm, E_range=E_range)
     n_e[loss_cone_mask, :] = np.nan     # num samples x num LOS pts x num E pts
     n_e[~np.isfinite(n_e)] = 0          # reset nan values to 0 for integration
 
@@ -135,7 +135,7 @@ def los_integrate(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray, MI: MeshInterpolat
     # By = np.einsum('ijk, ik -> ij', B_vec, y_vec)
     # cos2chi = (Bx**2 - By**2) / (Bx**2 + By**2)     # comes from tan(chi) = By / Bx
 
-    I_C = I(B_Gauss=(B_los_norm * nT_to_Gauss), cos2chi=np.ones_like(B_los_norm), alpha=alpha_los, n_e=n_e, E_range=E_range, s_range=s_range, CH=CH)
+    I_C = I(B_Gauss=B_los_norm, cos2chi=np.ones_like(B_los_norm), alpha=alpha_los, n_e=n_e, E_range=E_range, s_range=s_range, CH=CH)
     return T(I_C, CH=CH)
 
 
