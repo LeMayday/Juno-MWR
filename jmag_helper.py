@@ -3,7 +3,7 @@ import numpy as np
 import JupiterMag as jm
 
 # local files
-from global_vars import RJ, THREE_D_NDArray, FOUR_D_NDArray
+from global_vars import RJ_polar_ratio, THREE_D_NDArray, FOUR_D_NDArray
 
 # default
 import argparse
@@ -13,7 +13,6 @@ import sys
 from enum import IntEnum
 
 MAX_WORKERS = max(1, os.cpu_count() - 2)
-RJ_polar_ratio = 66854 / RJ
 MAXLEN = 30000
 
 class IDX(IntEnum):

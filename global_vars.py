@@ -9,6 +9,8 @@ FOUR_D_NDArray  = np.ndarray[tuple[int, int, int, int], np.dtype[np.float32]]
 
 # Jupiter
 RJ = 71492  # km
+RJ_polar_ratio = 66854 / RJ
+MJ = 4.218              # [gauss RJ^3] Levin eqn 9
 
 # Juno
 NU_O = np.array([0.6, 1.248, 2.597, 5.215, 10.004, 21.9, 1.4])   # GHz

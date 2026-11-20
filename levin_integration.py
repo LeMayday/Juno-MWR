@@ -4,19 +4,19 @@ from numpy.linalg import norm
 import pandas as pd
 
 # local files
-from global_vars import ONE_D_NDArray, TWO_D_NDArray, THREE_D_NDArray, CHS, NU_O, process_ch_inputs
-from mshell_map import alpha, alpha_eq, MeshInterpolator, mshell_argparser, make_Rlos
+from global_vars import ONE_D_NDArray, TWO_D_NDArray, THREE_D_NDArray, CHS, NU_O, process_ch_inputs, MJ
+from mshell_map import mshell_argparser, make_Rlos
 from bessel_functions import F, F_p, approxF
 from banana_slug import banana_argparser, banana_plot
 from PDS_helper import load_PJ_data, get_Juno_pos_RJ, get_boresight_dir
 from time_series import time_series_argparser, time_series_plot
+from bfield import alpha, alpha_eq, MeshInterpolator
 
 # default
 import argparse
 
 
 E0 = 5000; EPS = 2.25   # eqn 11
-MJ = 4.218              # [gauss RJ^3] eqn 9
 C = 1.09E7              # C (erg/s/Gauss) * c^2 (cm/s)^2 / k (erg/K) / (Hz/GHz)^2 * (cm/RJ)
 E_2PIMC = 2.79E-3       # GHz / Gauss
 nT_to_Gauss = 1E-5
