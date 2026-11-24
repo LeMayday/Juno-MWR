@@ -11,7 +11,7 @@ from PDS_helper import load_PJ_data, get_Juno_pos_RJ, get_boresight_dir, PDSErro
 from synchrotron_map import parse_PJs, stack_data
 from coordinates import lat_lonE
 from global_vars import process_ch_inputs, CHS, ONE_D_NDArray, TWO_D_NDArray, THREE_D_NDArray, VMAX
-from bfield import alpha, alpha_eq, BField
+from bfield import alpha, alpha_eq, BField, MeshInterpolator
 
 # default
 import argparse
@@ -184,7 +184,7 @@ def main():
     for pj in pjs: assert pj in range(1, 78), "Valid perijoves numbers are 1-77"
     Ms = np.array([float(M) for M in args.M.split(',')])
 
-    BF = BField(args.mesh_file)
+    BF = MeshInterpolator(args.mesh_file)
 
     for M in Ms:
         save_path = f"{IM_PATH}/{M}"

@@ -10,7 +10,7 @@ from bessel_functions import F, F_p, approxF
 from banana_slug import banana_argparser, banana_plot
 from PDS_helper import load_PJ_data, get_Juno_pos_RJ, get_boresight_dir
 from time_series import time_series_argparser, time_series_plot
-from bfield import alpha, alpha_eq, BField
+from bfield import alpha, alpha_eq, BField, DipoleField, MeshInterpolator
 
 # default
 import argparse
@@ -198,7 +198,7 @@ def main():
 
     if args.analysis != "VLA":
         chs = process_ch_inputs(args.ch)
-    BF = BField(args.mesh_file)
+    BF = MeshInterpolator(args.mesh_file)
     E_range = np.linspace(0.1, 50, 51)
 
     if args.analysis == "VLA":
