@@ -104,12 +104,22 @@ class MeshInterpolator(BField):
         y_vec = mesh_data["y_vec"]
         z_vec = mesh_data["z_vec"]
         points = (x_vec, y_vec, z_vec)
-        self.B     = UGLI(points=points, values=mesh_data["B_mesh"])
-        self.Beq   = UGLI(points=points, values=mesh_data["B_mesh_eq"])
-        self.M     = UGLI(points=points, values=mesh_data["Mshell"])
-        self.Bin   = UGLI(points=points, values=mesh_data["B_mesh_in"])
-        self.Bis   = UGLI(points=points, values=mesh_data["B_mesh_is"])
+        self.__B     = UGLI(points=points, values=mesh_data["B_mesh"])
+        self.__Beq   = UGLI(points=points, values=mesh_data["B_mesh_eq"])
+        self.__M     = UGLI(points=points, values=mesh_data["Mshell"])
+        self.__Bin   = UGLI(points=points, values=mesh_data["B_mesh_in"])
+        self.__Bis   = UGLI(points=points, values=mesh_data["B_mesh_is"])
         self.__lonxy = UGLI(points=points, values=mesh_data["dipole_xy"])
+
+    def B(self, R): return self.__B(R)
+
+    def Beq(self, R): return self.__Beq(R)
+
+    def Bin(self, R): return self.__Bin(R)
+
+    def Bis(self, R): return self.__Bis(R)
+
+    def M(self, R): return self.__M(R)
 
     def lonxy(self, xi):
         interp_lonxy = self.__lonxy(xi)     # interpolate xy since these are continuous
