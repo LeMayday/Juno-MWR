@@ -122,13 +122,17 @@ class DipoleField(BField):
         """
         Tilt dipole field for standard configurations
         """
+        self.config = config
         if config == "NoTilt":
             self.rot_th, self.rot_phi = 0, 0
         elif config == "Jupiter":
             self.rot_th, self.rot_phi = 10.25, 163.62   # see libjupitermag/src/trace.cc lines 30-31
 
     def __transform(self, X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        return SIIItoMag(X, Y, Z, self.rot_th, self.rot_phi)
+        if self.config == "NoTilt":
+            return X, Y, Z
+        Xm, Ym, Zm = SIIItoMag(X, Y, Z, self.rot_th, self.rot_phi)
+        return Xm, Ym, Zm
 
     def B(self, R):
         X, Y, Z = self.__transform(R[..., 0], R[..., 1], R[..., 2])
