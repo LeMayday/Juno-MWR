@@ -1,5 +1,6 @@
 # modules
 import numpy as np
+from numpy.linalg import norm
 import JupiterMag as jm
 
 # local files
@@ -141,9 +142,9 @@ def generate_Bfield_mesh(M_max: float, N: float, max_workers: int):
     n_splits *= 2                                           # be more conservative since extra memory could be used by TraceField object
     print("Tracing field...")
     footprint_data = tracefield_chunked(X, Y, Z, n_splits, max_workers)    # these positions are SIII! --- eq_data is domain x (x3, y3, z3, M, lon) along last axis, lon in radians
-    B_mesh_eq = B(footprint_data[..., IDX.XEQ], footprint_data[..., IDX.YEQ], footprint_data[..., IDX.ZEQ])
-    B_mesh_in = B(footprint_data[..., IDX.XIN], footprint_data[..., IDX.YIN], footprint_data[..., IDX.ZIN])
-    B_mesh_is = B(footprint_data[..., IDX.XIS], footprint_data[..., IDX.YIS], footprint_data[..., IDX.ZIS])
+    B_mesh_eq = norm(B(footprint_data[..., IDX.XEQ], footprint_data[..., IDX.YEQ], footprint_data[..., IDX.ZEQ]), axis=-1)
+    B_mesh_in = norm(B(footprint_data[..., IDX.XIN], footprint_data[..., IDX.YIN], footprint_data[..., IDX.ZIN]), axis=-1)
+    B_mesh_is = norm(B(footprint_data[..., IDX.XIS], footprint_data[..., IDX.YIS], footprint_data[..., IDX.ZIS]), axis=-1)
     Mshell = footprint_data[..., IDX.MSH]
     dipole_xy = np.stack((footprint_data[..., IDX.XEM], footprint_data[..., IDX.YEM]), axis=-1)     # dipole_lon is dicontinuous and not interpolatable
 

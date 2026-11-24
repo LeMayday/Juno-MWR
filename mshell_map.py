@@ -40,8 +40,8 @@ def intersect_alphas_lons(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray, MI: MeshIn
     B_los = MI.B(r_los)                                         # num samples x num LOS pts x 3
     alpha_los = alpha(r_b, B_los)
 
-    Beq_los = MI.Beq(r_los)
-    alpha_eq_los = alpha_eq(alpha_los, norm(Beq_los, axis=-1), norm(B_los, axis=-1))
+    Beq_los_norm = MI.Beq(r_los)
+    alpha_eq_los = alpha_eq(alpha_los, Beq_los_norm, norm(B_los, axis=-1))
 
     lon_los = MI.lonxy(r_los)
 

@@ -114,12 +114,9 @@ def T(I_C: TWO_D_NDArray, CH: CHS) -> TWO_D_NDArray:
 def los_integrate(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray, MI: MeshInterpolator, E_range: ONE_D_NDArray, s_range: ONE_D_NDArray, CH: CHS) -> ONE_D_NDArray:
     B_los = MI.B(r_los) * nT_to_Gauss
     B_los_norm = norm(B_los, axis=-1)
-    Beq_los = MI.Beq(r_los) * nT_to_Gauss
-    Beq_los_norm = norm(Beq_los, axis=-1)
-    Bin_los = MI.Bin(r_los) * nT_to_Gauss
-    Bin_los_norm = norm(Bin_los, axis=-1)
-    Bis_los = MI.Bis(r_los) * nT_to_Gauss
-    Bis_los_norm = norm(Bis_los, axis=-1)
+    Beq_los_norm = MI.Beq(r_los) * nT_to_Gauss
+    Bin_los_norm = MI.Bin(r_los) * nT_to_Gauss
+    Bis_los_norm = MI.Bis(r_los) * nT_to_Gauss
 
     alpha_los = alpha(r_b, B_los)
     sin_alpha = np.sin(alpha_los)
