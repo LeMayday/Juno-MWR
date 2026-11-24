@@ -1,6 +1,7 @@
 # modules
 import numpy as np
 from scipy.ndimage import map_coordinates
+from JupiterMag.CoordConv import SIIItoMag
 
 # local files
 from coordinates import lat_lonE
@@ -8,6 +9,7 @@ from global_vars import RJ, RJ_polar_ratio, MJ
 
 # default
 from abc import ABC, abstractmethod
+from typing import Literal
 
 
 class UniformGridLinearInterpolator:
@@ -116,15 +118,17 @@ class MeshInterpolator(BField):
 
 
 class DipoleField(BField):
-    def __init__(self, rot_th: float = 0, rot_phi: float = 0):
+    def __init__(self, config: Literal["NoTilt", "Jupiter"] = "NoTilt"):
         """
-        Tilt dipole field by rot_th from z-axis and rot_phi from x-axis
+        Tilt dipole field for standard configurations
         """
-        self.rot_th = rot_th
-        self.rot_phi = rot_phi
+        if config == "NoTilt":
+            self.rot_th, self.rot_phi = 0, 0
+        elif config == "Jupiter":
+            self.rot_th, self.rot_phi = 10.25, 163.62   # see libjupitermag/src/trace.cc lines 30-31
 
     def __transform(self, X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        pass
+        return SIIItoMag(X, Y, Z, self.rot_th, self.rot_phi)
 
     def B(self, R):
         X, Y, Z = self.__transform(R[..., 0], R[..., 1], R[..., 2])
