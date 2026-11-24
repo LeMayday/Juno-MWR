@@ -11,7 +11,7 @@ from PDS_helper import load_PJ_data, get_Juno_pos_RJ, get_boresight_dir, PDSErro
 from synchrotron_map import parse_PJs, stack_data
 from coordinates import lat_lonE
 from global_vars import process_ch_inputs, CHS, ONE_D_NDArray, TWO_D_NDArray, THREE_D_NDArray, VMAX
-from bfield import alpha, alpha_eq, UGLI, MeshInterpolator
+from bfield import alpha, alpha_eq, BField
 
 # default
 import argparse
@@ -32,18 +32,18 @@ def make_Rlos(r_sc: np.ndarray, r_b: np.ndarray, smin: float, smax: float, sN: i
     return r_sc[:, None, :] + s_los                     # add spacecraft positions to LOS points
 
 
-def intersect_alphas_lons(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray, MI: MeshInterpolator, M: float, dM: float) -> tuple[ONE_D_NDArray, ONE_D_NDArray, ONE_D_NDArray, TWO_D_NDArray]:
+def intersect_alphas_lons(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray, BF: BField, M: float, dM: float) -> tuple[ONE_D_NDArray, ONE_D_NDArray, ONE_D_NDArray, TWO_D_NDArray]:
     # r_los is position at each sample time and at each point along LOS (num samples x num LOS pts x 3)
     # r_b is vector of normalized boresight vectors in SIII
-    M_los = MI.M(r_los)                                         # num samples x num LOS pts
+    M_los = BF.M(r_los)                                         # num samples x num LOS pts
     mask_M = np.logical_and(M_los > M - dM, M_los < M + dM)     # where the LOS is looking at the desired M-shell
-    B_los = MI.B(r_los)                                         # num samples x num LOS pts x 3
+    B_los = BF.B(r_los)                                         # num samples x num LOS pts x 3
     alpha_los = alpha(r_b, B_los)
 
-    Beq_los_norm = MI.Beq(r_los)
+    Beq_los_norm = BF.Beq(r_los)
     alpha_eq_los = alpha_eq(alpha_los, Beq_los_norm, norm(B_los, axis=-1))
 
-    lon_los = MI.lonxy(r_los)
+    lon_los = BF.lonxy(r_los)
 
     # filter regions outside Mshell
     alpha_los[~mask_M] = np.nan
@@ -56,10 +56,10 @@ def intersect_alphas_lons(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray, MI: MeshIn
     return np.rad2deg(alpha_data), np.rad2deg(alpha_eq_data), lon_data, mask_M    # return everything in degrees
 
 
-def mask_M(Jn_SIII: TWO_D_NDArray, UGLI_M: UGLI, M: float) -> ONE_D_NDArray:
+def mask_M(Jn_SIII: TWO_D_NDArray, BF: BField, M: float) -> ONE_D_NDArray:
     # inputs are Juno positions in SIII / RJ, an interpolator for Mshell on the mesh, and the desired M shell
     # Jn_SIII is # num samples x 3
-    Jn_Ms = UGLI_M(Jn_SIII)
+    Jn_Ms = BF.M(Jn_SIII)
     return np.logical_and(Jn_Ms > 1.01, Jn_Ms < M * 0.98)
 
 
@@ -115,17 +115,17 @@ def plot_data(data: THREE_D_NDArray, CHS: list[CHS], params_str: str, vmax: list
     plt.close(fig)
 
 
-def geometry_mask(GRDR_data_pj: DataFrame, UGLI_M: UGLI, M: float, CH: Literal[CHS.CH1, CHS.CH2]) -> ONE_D_NDArray:
+def geometry_mask(GRDR_data_pj: DataFrame, BF: BField, M: float, CH: Literal[CHS.CH1, CHS.CH2]) -> ONE_D_NDArray:
     Jn_SIII = get_Juno_pos_RJ(GRDR_data_pj)
     lat_mask = mask_lat(Jn_SIII)                    # mask for near the equator
-    pos_mask = mask_M(Jn_SIII, UGLI_M, M)           # mask for within mshell
+    pos_mask = mask_M(Jn_SIII, BF, M)               # mask for within mshell
     pos_mask = np.logical_and(pos_mask, lat_mask)
     jupiter_mask = mask_jupiter(GRDR_data_pj[f"PC_lon_JsB{CH+1}"].to_numpy())   # mask where looking at jupiter
     return np.logical_and(~jupiter_mask, pos_mask)
 
 
 def geometry_intersections(GRDR_data_pj: DataFrame, mask: ONE_D_NDArray, M: float, CH: Literal[CHS.CH1, CHS.CH2],
-                           MI: MeshInterpolator, save_params: str = None) -> tuple[ONE_D_NDArray, ONE_D_NDArray, ONE_D_NDArray]:
+                           BF: BField, save_params: str = None) -> tuple[ONE_D_NDArray, ONE_D_NDArray, ONE_D_NDArray]:
     # grab relevant columns
     Jn_SIII = get_Juno_pos_RJ(GRDR_data_pj)
     boresight_SIII = get_boresight_dir(GRDR_data_pj=GRDR_data_pj, CH=CH)
@@ -133,19 +133,19 @@ def geometry_intersections(GRDR_data_pj: DataFrame, mask: ONE_D_NDArray, M: floa
     boresight_SIII = boresight_SIII[mask, :]        # mask boresights
 
     r_los = make_Rlos(r_sc=Jn_SIII, r_b=boresight_SIII, smin=0.2, smax=7, sN=100)
-    alphas, alphas_eq, lons, r_los_mask = intersect_alphas_lons(r_los=r_los, r_b=boresight_SIII, MI=MI, M=M, dM=0.05)
+    alphas, alphas_eq, lons, r_los_mask = intersect_alphas_lons(r_los=r_los, r_b=boresight_SIII, BF=BF, M=M, dM=0.05)
     if save_params is not None:
         np.savez(f"npz/MWR_plottables_{save_params}.npz", r_sc=Jn_SIII, r_b=boresight_SIII, r_los=r_los, r_los_mask=r_los_mask)
     return alphas, alphas_eq, lons
 
 
 def map_Ta_to_M(IRDR_data_pj: DataFrame, GRDR_data_pj: DataFrame, M: float, pj: int,
-                MI: MeshInterpolator, num_lons: int = 180, num_alphas: int = 90) -> tuple[THREE_D_NDArray, THREE_D_NDArray]:
+                BF: BField, num_lons: int = 180, num_alphas: int = 90) -> tuple[THREE_D_NDArray, THREE_D_NDArray]:
     print("Calculating intersections")
-    mask1 = geometry_mask(GRDR_data_pj=GRDR_data_pj, UGLI_M=MI.M, M=M, CH=CHS.CH1)
-    mask2 = geometry_mask(GRDR_data_pj=GRDR_data_pj, UGLI_M=MI.M, M=M, CH=CHS.CH2)
-    alphas1, alphas_eq1, lons1 = geometry_intersections(GRDR_data_pj=GRDR_data_pj, mask=mask1, M=M, CH=CHS.CH1, MI=MI, save_params=f"M{M}_PJ{pj}_CH{1}")
-    alphas2, alphas_eq2, lons2 = geometry_intersections(GRDR_data_pj=GRDR_data_pj, mask=mask2, M=M, CH=CHS.CH2, MI=MI, save_params=f"M{M}_PJ{pj}_CH{2}")
+    mask1 = geometry_mask(GRDR_data_pj=GRDR_data_pj, BF=BF, M=M, CH=CHS.CH1)
+    mask2 = geometry_mask(GRDR_data_pj=GRDR_data_pj, BF=BF, M=M, CH=CHS.CH2)
+    alphas1, alphas_eq1, lons1 = geometry_intersections(GRDR_data_pj=GRDR_data_pj, mask=mask1, M=M, CH=CHS.CH1, BF=BF, save_params=f"M{M}_PJ{pj}_CH{1}")
+    alphas2, alphas_eq2, lons2 = geometry_intersections(GRDR_data_pj=GRDR_data_pj, mask=mask2, M=M, CH=CHS.CH2, BF=BF, save_params=f"M{M}_PJ{pj}_CH{2}")
     out_Ta = np.full((6, num_alphas, num_lons), np.nan)
     out_alpha = np.full_like(out_Ta, np.nan)
     for CH in CHS:
@@ -184,7 +184,7 @@ def main():
     for pj in pjs: assert pj in range(1, 78), "Valid perijoves numbers are 1-77"
     Ms = np.array([float(M) for M in args.M.split(',')])
 
-    MI = MeshInterpolator(args.mesh_file)
+    BF = BField(args.mesh_file)
 
     for M in Ms:
         save_path = f"{IM_PATH}/{M}"
@@ -201,7 +201,7 @@ def main():
                 print(f"Skipping PJ: {pj}")
                 skipped_PJs.append(pj)
                 continue
-            mapped_Ta_pj, mapped_alpha_pj = map_Ta_to_M(IRDR_data_pj=IRDR_data_pj, GRDR_data_pj=GRDR_data_pj, M=M, pj=pj, MI=MI)
+            mapped_Ta_pj, mapped_alpha_pj = map_Ta_to_M(IRDR_data_pj=IRDR_data_pj, GRDR_data_pj=GRDR_data_pj, M=M, pj=pj, BF=BF)
             series_Ta[..., i] = mapped_Ta_pj
             series_alpha[..., i] = mapped_alpha_pj
         print(f"Data compilation finished. Skipped PJs: {skipped_PJs}")

@@ -1,7 +1,13 @@
+# modules
 import numpy as np
 from scipy.ndimage import map_coordinates
+
+# local files
 from coordinates import lat_lonE
-from global_vars import RJ_polar_ratio, MJ
+from global_vars import RJ, RJ_polar_ratio, MJ
+
+# default
+from abc import ABC, abstractmethod
 
 
 class UniformGridLinearInterpolator:
@@ -38,7 +44,57 @@ class UniformGridLinearInterpolator:
 UGLI = UniformGridLinearInterpolator  # type alias
 
 
-class MeshInterpolator:
+class BField(ABC):
+    @abstractmethod
+    def B(self, R: np.ndarray) -> np.ndarray:
+        """
+        R: vector of positions, with (x,y,z) along last axis
+
+        Returns: vector of B components, similar shape as R, with (Bx,By,Bz) along last axis
+        """
+        pass
+    @abstractmethod
+    def Beq(self, R: np.ndarray) -> np.ndarray:
+        """
+        R: vector of positions, with (x,y,z) along last axis
+
+        Returns: vector of B magnitudes, same shape as R
+        """
+        pass
+    @abstractmethod
+    def Bin(self, R: np.ndarray) -> np.ndarray:
+        """
+        R: vector of positions, with (x,y,z) along last axis
+
+        Returns: vector of mapped B magnitudes at north ionosphere footprint, same shape as R
+        """
+        pass
+    @abstractmethod
+    def Bis(self, R: np.ndarray) -> np.ndarray:
+        """
+        R: vector of positions, with (x,y,z) along last axis
+
+        Returns: vector of mapped B magnitudes at south ionosphere footprint, same shape as R
+        """
+        pass
+    @abstractmethod
+    def M(self, R: np.ndarray) -> np.ndarray:
+        """
+        R: vector of positions, with (x,y,z) along last axis
+
+        Returns: vector of M-shell values, same shape as R
+        """
+        pass
+    @abstractmethod
+    def lonxy(self, R: np.ndarray) -> np.ndarray:
+        """
+        R: vector of positions, with (x,y,z) along last axis
+
+        Returns: vector of magnetic longitudes as (x,y) coordinates in dipole frame, similar shape as R, with (x,y) along last axis
+        """
+        pass
+
+class MeshInterpolator(BField):
     def __init__(self, mesh_file: str):
         # construct RegularGridInterpolators for each mesh value
         mesh_data = np.load(mesh_file)
@@ -54,12 +110,45 @@ class MeshInterpolator:
         self.__lonxy = UGLI(points=points, values=mesh_data["dipole_xy"])
 
     def lonxy(self, xi):
-        """
-        Interpolate magnetic longitudes.
-        """
         interp_lonxy = self.__lonxy(xi)     # interpolate xy since these are continuous
         _, interp_lon = lat_lonE(interp_lonxy[..., 0], interp_lonxy[..., 1], 0)
         return interp_lon
+
+
+class DipoleField(BField):
+    def __init__(self, rot_th: float = 0, rot_phi: float = 0):
+        """
+        Tilt dipole field by rot_th from z-axis and rot_phi from x-axis
+        """
+        self.rot_th = rot_th
+        self.rot_phi = rot_phi
+
+    def __transform(self, X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        pass
+
+    def B(self, R):
+        X, Y, Z = self.__transform(R[..., 0], R[..., 1], R[..., 2])
+        return B_dipole(X, Y, Z)
+
+    def Beq(self, R):
+        X, Y, Z = self.__transform(R[..., 0], R[..., 1], R[..., 2])
+        return Beq_dipole(X, Y, Z)
+
+    def Bin(self, R):
+        X, Y, Z = self.__transform(R[..., 0], R[..., 1], R[..., 2])
+        return Bion_dipole(X, Y, Z)
+
+    def Bis(self, R):
+        return self.Bin(R)
+
+    def M(self, R):
+        X, Y, Z = self.__transform(R[..., 0], R[..., 1], R[..., 2])
+        return L_dipole(X, Y, Z)
+
+    def lonxy(self, R):
+        X, Y, _ = self.__transform(R[..., 0], R[..., 1], R[..., 2])
+        _, lon = lat_lonE(X, Y, 0)
+        return lon
 
 
 def alpha(r_b: np.ndarray, B: np.ndarray) -> np.ndarray:
@@ -86,3 +175,45 @@ def alpha_eq(alpha: np.ndarray, Beq: np.ndarray, B: np.ndarray) -> np.ndarray:
     clip_mask = np.abs(inner) < 1.1
     inner[clip_mask] = np.clip(inner[clip_mask], a_min=-1, a_max=1)
     return np.asin(inner)
+
+
+def B_dipole(X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    rho2 = X**2 + Y**2
+    r2 = rho2 + Z**2
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        r = np.sqrt(r2)
+        r5 = r2**2 * r
+        Bx = 3 * MJ * X * Z / r5
+        By = 3 * MJ * Y * Z / r5
+        Bz = MJ * (3 * Z**2 - r2) / r5
+
+    mask = X**2 + Y**2 + (Z / RJ_polar_ratio)**2 < 1
+    Bx[mask] = np.nan
+    By[mask] = np.nan
+    Bz[mask] = np.nan
+    return Bx, By, Bz
+
+
+def L_dipole(X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> np.ndarray:
+    rho2 = X**2 + Y**2
+    r3 = (rho2 + Z**2)**(3/2)
+    return r3 / rho2
+
+
+def Beq_dipole(X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> np.ndarray:
+    with np.errstate(divide="ignore", invalid="ignore"):
+        L = L_dipole(X, Y, Z)
+        Beq = MJ / L**3
+    return Beq
+
+
+def Bion_dipole(X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> np.ndarray:
+    # calculates footprint assuming intersection with ellipsoid of height 500 km above Jupiter
+    a = 1; c = RJ_polar_ratio; h = 500 / RJ
+    b = (c+h)**2 - (a+h)**2
+    with np.errstate(divide="ignore", invalid="ignore"):
+        L = L_dipole(X, Y, Z)
+        sin2th = (-b + np.sqrt(b**2 + 4 * L**2 * (c+h)**2)) / (2 * L**2)
+        Bion = MJ / L**3 * np.sqrt(4 - 3 * sin2th) / sin2th**3
+    return Bion

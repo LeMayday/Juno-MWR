@@ -10,7 +10,7 @@ from bessel_functions import F, F_p, approxF
 from banana_slug import banana_argparser, banana_plot
 from PDS_helper import load_PJ_data, get_Juno_pos_RJ, get_boresight_dir
 from time_series import time_series_argparser, time_series_plot
-from bfield import alpha, alpha_eq, MeshInterpolator
+from bfield import alpha, alpha_eq, BField
 
 # default
 import argparse
@@ -111,12 +111,12 @@ def T(I_C: TWO_D_NDArray, CH: CHS) -> TWO_D_NDArray:
     return C * I_C / NU_O[CH]**2
 
 
-def los_integrate(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray, MI: MeshInterpolator, E_range: ONE_D_NDArray, s_range: ONE_D_NDArray, CH: CHS) -> ONE_D_NDArray:
-    B_los = MI.B(r_los) * nT_to_Gauss
+def los_integrate(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray, BF: BField, E_range: ONE_D_NDArray, s_range: ONE_D_NDArray, CH: CHS) -> ONE_D_NDArray:
+    B_los = BF.B(r_los) * nT_to_Gauss
     B_los_norm = norm(B_los, axis=-1)
-    Beq_los_norm = MI.Beq(r_los) * nT_to_Gauss
-    Bin_los_norm = MI.Bin(r_los) * nT_to_Gauss
-    Bis_los_norm = MI.Bis(r_los) * nT_to_Gauss
+    Beq_los_norm = BF.Beq(r_los) * nT_to_Gauss
+    Bin_los_norm = BF.Bin(r_los) * nT_to_Gauss
+    Bis_los_norm = BF.Bis(r_los) * nT_to_Gauss
 
     alpha_los = alpha(r_b, B_los)
     sin_alpha = np.sin(alpha_los)
@@ -136,7 +136,7 @@ def los_integrate(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray, MI: MeshInterpolat
     return T(I_C, CH=CH)
 
 
-def imitate_IRDR(GRDR_data_pj: pd.DataFrame, MI: MeshInterpolator, E_range: ONE_D_NDArray, sN: int) -> pd.DataFrame:
+def imitate_IRDR(GRDR_data_pj: pd.DataFrame, BF: BField, E_range: ONE_D_NDArray, sN: int) -> pd.DataFrame:
     smin=0.2; smax=7
     s_range = np.linspace(smin, smax, sN + 1)
     Jn_SIII = get_Juno_pos_RJ(GRDR_data_pj)
@@ -152,13 +152,13 @@ def imitate_IRDR(GRDR_data_pj: pd.DataFrame, MI: MeshInterpolator, E_range: ONE_
             r_los, r_b = r_los1, boresight_SIII_ch1
         else:
             r_los, r_b = r_los2, boresight_SIII_ch2
-        Ta_data[:, CH] = los_integrate(r_los=r_los, r_b=r_b, MI=MI, E_range=E_range, s_range=s_range, CH=CH)
+        Ta_data[:, CH] = los_integrate(r_los=r_los, r_b=r_b, BF=BF, E_range=E_range, s_range=s_range, CH=CH)
 
     time_data = GRDR_data_pj[['Time_ET', 'Time_UTC']].to_numpy()
     return pd.DataFrame(np.concatenate((time_data, Ta_data), axis=1), columns=(['Time_ET', 'Time_UTC'] + [CH.name for CH in CHS]))
 
 
-def recreate_VLA(MI: MeshInterpolator, E_range: ONE_D_NDArray, Ny: int, Nz: int, Ns: int):
+def recreate_VLA(BF: BField, E_range: ONE_D_NDArray, Ny: int, Nz: int, Ns: int):
     smin = 0.2; smax = 9
     s_range = np.linspace(smin, smax, Ns + 1)
     y = np.linspace(-5, 5, Ny + 1)
@@ -169,7 +169,7 @@ def recreate_VLA(MI: MeshInterpolator, E_range: ONE_D_NDArray, Ny: int, Nz: int,
     cam_dir = np.zeros_like(cam_pos)
     cam_dir[:, 0] = -1                                              # looking in -x direction
     r_los = make_Rlos(r_sc=cam_pos, r_b=cam_dir, smin=smin, smax=smax, sN=Ns)
-    Ta_VLA = los_integrate(r_los=r_los, r_b=cam_dir, MI=MI, E_range=E_range, s_range=s_range, CH=CHS.VLA1)
+    Ta_VLA = los_integrate(r_los=r_los, r_b=cam_dir, BF=BF, E_range=E_range, s_range=s_range, CH=CHS.VLA1)
 
     import matplotlib.pyplot as plt
     fig = plt.figure(figsize=[8,6])
@@ -198,19 +198,19 @@ def main():
 
     if args.analysis != "VLA":
         chs = process_ch_inputs(args.ch)
-    MI = MeshInterpolator(args.mesh_file)
+    BF = BField(args.mesh_file)
     E_range = np.linspace(0.1, 50, 51)
 
     if args.analysis == "VLA":
-        recreate_VLA(MI=MI, E_range=E_range, Ny=100, Nz=100, Ns=100)
+        recreate_VLA(BF=BF, E_range=E_range, Ny=100, Nz=100, Ns=100)
     elif args.analysis == "time":
         _, GRDR_data_pj = load_PJ_data(args.PJ, args.dt, chs)
-        IRDR_data_pj = imitate_IRDR(GRDR_data_pj=GRDR_data_pj, MI=MI, E_range=E_range, sN=50)
+        IRDR_data_pj = imitate_IRDR(GRDR_data_pj=GRDR_data_pj, BF=BF, E_range=E_range, sN=50)
         time_series_plot(IRDR_data_pj, args.PJ)
         IRDR_data_pj.to_csv(f"IRDR_data_PJ{args.PJ}_dt{args.dt}_sN{50}.csv")
     elif args.analysis == "banana":
         _, GRDR_data_pj = load_PJ_data(args.PJ, args.dt, chs)
-        IRDR_data_pj = imitate_IRDR(GRDR_data_pj=GRDR_data_pj, MI=MI, E_range=E_range, sN=50)
+        IRDR_data_pj = imitate_IRDR(GRDR_data_pj=GRDR_data_pj, BF=BF, E_range=E_range, sN=50)
         banana_plot(IRDR_data_pj, GRDR_data_pj, args.dspr, f"Levin_PJs{args.PJ}_CHs{args.ch}_dt{args.dt}", args.type)
 
     elif args.analysis == "mshell":
