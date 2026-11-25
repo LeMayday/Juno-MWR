@@ -128,15 +128,19 @@ class MeshInterpolator(BField):
 
 
 class DipoleField(BField):
-    def __init__(self, config: Literal["NoTilt", "Jupiter"] = "NoTilt"):
+    def __init__(self, config: Literal["NoTilt", "Jupiter"] = "NoTilt", m_dipole: float = None):
         """
         Tilt dipole field for standard configurations
         """
         self.config = config
         if config == "NoTilt":
+            if m_dipole is None:
+                raise ValueError("NoTilt dipole must specify m_dipole")
             self.rot_th, self.rot_phi = 0, 0
+            self.m_dipole = m_dipole
         elif config == "Jupiter":
             self.rot_th, self.rot_phi = 10.25, 163.62   # see libjupitermag/src/trace.cc lines 30-31
+            self.m_dipole = MJ * 1E5                    # [nT RJ^3]
 
     def __transform(self, X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         if self.config == "NoTilt":
@@ -146,15 +150,16 @@ class DipoleField(BField):
 
     def B(self, R):
         X, Y, Z = self.__transform(R[..., 0], R[..., 1], R[..., 2])
-        return B_dipole(X, Y, Z)
+        Bx, By, Bz = B_dipole(X, Y, Z, self.m_dipole)
+        return np.stack((Bx, By, Bz), axis=-1)
 
     def Beq(self, R):
         X, Y, Z = self.__transform(R[..., 0], R[..., 1], R[..., 2])
-        return Beq_dipole(X, Y, Z)
+        return Beq_dipole(X, Y, Z, self.m_dipole)
 
     def Bin(self, R):
         X, Y, Z = self.__transform(R[..., 0], R[..., 1], R[..., 2])
-        return Bion_dipole(X, Y, Z)
+        return Bion_dipole(X, Y, Z, self.m_dipole)
 
     def Bis(self, R):
         return self.Bin(R)
@@ -195,16 +200,16 @@ def alpha_eq(alpha: np.ndarray, Beq: np.ndarray, B: np.ndarray) -> np.ndarray:
     return np.asin(inner)
 
 
-def B_dipole(X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def B_dipole(X: np.ndarray, Y: np.ndarray, Z: np.ndarray, m: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     rho2 = X**2 + Y**2
     r2 = rho2 + Z**2
 
     with np.errstate(divide="ignore", invalid="ignore"):
         r = np.sqrt(r2)
         r5 = r2**2 * r
-        Bx = 3 * MJ * X * Z / r5
-        By = 3 * MJ * Y * Z / r5
-        Bz = MJ * (3 * Z**2 - r2) / r5
+        Bx = 3 * m * X * Z / r5
+        By = 3 * m * Y * Z / r5
+        Bz = m * (3 * Z**2 - r2) / r5
 
     mask = X**2 + Y**2 + (Z / RJ_polar_ratio)**2 < 1
     Bx[mask] = np.nan
@@ -219,19 +224,19 @@ def L_dipole(X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> np.ndarray:
     return r3 / rho2
 
 
-def Beq_dipole(X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> np.ndarray:
+def Beq_dipole(X: np.ndarray, Y: np.ndarray, Z: np.ndarray, m: float) -> np.ndarray:
     with np.errstate(divide="ignore", invalid="ignore"):
         L = L_dipole(X, Y, Z)
-        Beq = MJ / L**3
+        Beq = m / L**3
     return Beq
 
 
-def Bion_dipole(X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> np.ndarray:
+def Bion_dipole(X: np.ndarray, Y: np.ndarray, Z: np.ndarray, m: float) -> np.ndarray:
     # calculates footprint assuming intersection with ellipsoid of height 500 km above Jupiter
     a = 1; c = RJ_polar_ratio; h = 500 / RJ
     b = (c+h)**2 - (a+h)**2
     with np.errstate(divide="ignore", invalid="ignore"):
         L = L_dipole(X, Y, Z)
         sin2th = (-b + np.sqrt(b**2 + 4 * L**2 * (c+h)**2)) / (2 * L**2)
-        Bion = MJ / L**3 * np.sqrt(4 - 3 * sin2th) / sin2th**3
+        Bion = m / L**3 * np.sqrt(4 - 3 * sin2th) / sin2th**3
     return Bion
