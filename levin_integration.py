@@ -137,7 +137,7 @@ def los_integrate(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray, BF: BField, E_rang
     sin_alpha = np.sin(alpha_los)
 
     B_mirror = B_los_norm / sin_alpha**2
-    loss_cone_mask = B_mirror > np.minimum(Bin_los_norm, Bis_los_norm)      # perhaps not valid if not dipole?
+    loss_cone_mask = B_mirror > np.minimum(Bin_los_norm, Bis_los_norm)
 
     n_e = N(alpha=alpha_los, B_Gauss=B_los_norm, Beq_Gauss=Beq_los_norm, E_range=E_range)
     n_e[loss_cone_mask, :] = np.nan     # num samples x num LOS pts x num E pts
@@ -179,7 +179,7 @@ def recreate_VLA(BF: BField, E_range: ONE_D_NDArray, Ny: int, Nz: int, Ns: int):
     y = np.linspace(-5, 5, Ny + 1)
     z = np.linspace(-5, 5, Nz + 1)
     Y, Z = np.meshgrid(y, z, indexing='xy')
-    cam_pos = np.stack((np.full_like(Y, 4.5), Y, Z), axis=-1)       # points along y-z plane at x = 9.5
+    cam_pos = np.stack((np.full_like(Y, 4.5), Y, Z), axis=-1)       # points along y-z plane at x = 4.5
     cam_pos = cam_pos.reshape(-1, cam_pos.shape[-1])
     cam_dir = np.zeros_like(cam_pos)
     cam_dir[:, 0] = -1                                              # looking in -x direction
@@ -199,7 +199,6 @@ def recreate_VLA(BF: BField, E_range: ONE_D_NDArray, Ny: int, Nz: int, Ns: int):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-f', "--mesh-file", required=True, type=str, help="npz file containing mesh information")
     subparsers = parser.add_subparsers(dest="analysis", required=True)
     subparsers.add_parser("VLA", help="Make VLA-like plot for debugging")
     time_parser = subparsers.add_parser("time", help="Make time series plot")
@@ -208,12 +207,15 @@ def main():
     banana_argparser(banana_parser)
     mshell_parser = subparsers.add_parser("mshell", help="Make M-shell plot")
     mshell_argparser(mshell_parser)
-    mshell_parser.set_defaults(mesh_file=argparse.SUPPRESS)
+    parser.add_argument('-f', "--mesh-file", required=False, type=str, default=None, help="Optional: npz file containing mesh information. If not provided, defaults to dipole field")
     args = parser.parse_args()
 
     if args.analysis != "VLA":
         chs = process_ch_inputs(args.ch)
-    BF = MeshInterpolator(args.mesh_file)
+    if args.mesh_file is None:
+        BF = DipoleField(config="Jupiter")
+    else:
+        BF = MeshInterpolator(args.mesh_file)
     E_range = np.linspace(0.1, 50, 51)
 
     if args.analysis == "VLA":

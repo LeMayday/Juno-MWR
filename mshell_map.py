@@ -11,7 +11,7 @@ from PDS_helper import load_PJ_data, get_Juno_pos_RJ, get_boresight_dir, PDSErro
 from synchrotron_map import parse_PJs, stack_data
 from coordinates import lat_lonE
 from global_vars import process_ch_inputs, CHS, ONE_D_NDArray, TWO_D_NDArray, THREE_D_NDArray, VMAX
-from bfield import alpha, alpha_eq, BField, MeshInterpolator
+from bfield import alpha, alpha_eq, BField, MeshInterpolator, DipoleField
 
 # default
 import argparse
@@ -170,13 +170,14 @@ def mshell_argparser(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
     parser.add_argument("--ch", required=False, type=str, default="1,2,3,4,5,6", help="List of channels separated by comma")
     parser.add_argument("--PJs", required=True, type=str, help="Perijove range (e.g. 1,2,5,6 or 1-7 or 1,3-6)")
     parser.add_argument("--M", required=True, type=str, help="M-shell")
-    parser.add_argument('-f', "--mesh-file", required=True, type=str, help="npz file containing mesh information")
     return parser
 
 
 def main():
     parser = argparse.ArgumentParser()
-    args = mshell_argparser(parser).parse_args()
+    mshell_argparser(parser)
+    parser.add_argument('-f', "--mesh-file", required=False, type=str, default=None, help="Optional: npz file containing mesh information. If not provided, defaults to dipole field")
+    args = parser.parse_args()
 
     # input validation
     chs = process_ch_inputs(args.ch)
@@ -184,7 +185,10 @@ def main():
     for pj in pjs: assert pj in range(1, 78), "Valid perijoves numbers are 1-77"
     Ms = np.array([float(M) for M in args.M.split(',')])
 
-    BF = MeshInterpolator(args.mesh_file)
+    if args.mesh_file is None:
+        BF = DipoleField(config="Jupiter")
+    else:
+        BF = MeshInterpolator(args.mesh_file)
 
     for M in Ms:
         save_path = f"{IM_PATH}/{M}"
