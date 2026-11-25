@@ -150,28 +150,70 @@ class DipoleField(BField):
 
     def B(self, R):
         X, Y, Z = self.__transform(R[..., 0], R[..., 1], R[..., 2])
-        Bx, By, Bz = B_dipole(X, Y, Z, self.m_dipole)
+        Bx, By, Bz = DipoleField.B_dipole(X, Y, Z, self.m_dipole)
         return np.stack((Bx, By, Bz), axis=-1)
 
     def Beq(self, R):
         X, Y, Z = self.__transform(R[..., 0], R[..., 1], R[..., 2])
-        return Beq_dipole(X, Y, Z, self.m_dipole)
+        return DipoleField.Beq_dipole(X, Y, Z, self.m_dipole)
 
     def Bin(self, R):
         X, Y, Z = self.__transform(R[..., 0], R[..., 1], R[..., 2])
-        return Bion_dipole(X, Y, Z, self.m_dipole)
+        return DipoleField.Bion_dipole(X, Y, Z, self.m_dipole)
 
     def Bis(self, R):
         return self.Bin(R)
 
     def M(self, R):
         X, Y, Z = self.__transform(R[..., 0], R[..., 1], R[..., 2])
-        return L_dipole(X, Y, Z)
+        return DipoleField.__L_dipole(X, Y, Z)
 
     def lonxy(self, R):
         X, Y, _ = self.__transform(R[..., 0], R[..., 1], R[..., 2])
         _, lon = lat_lonE(X, Y, 0)
         return lon
+
+    @staticmethod
+    def B_dipole(X: np.ndarray, Y: np.ndarray, Z: np.ndarray, m: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        rho2 = X**2 + Y**2
+        r2 = rho2 + Z**2
+
+        with np.errstate(divide="ignore", invalid="ignore"):
+            r = np.sqrt(r2)
+            r5 = r2**2 * r
+            Bx = 3 * m * X * Z / r5
+            By = 3 * m * Y * Z / r5
+            Bz = m * (3 * Z**2 - r2) / r5
+
+        mask = X**2 + Y**2 + (Z / RJ_polar_ratio)**2 < 1
+        Bx[mask] = np.nan
+        By[mask] = np.nan
+        Bz[mask] = np.nan
+        return Bx, By, Bz
+
+    @staticmethod
+    def __L_dipole(X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> np.ndarray:
+        rho2 = X**2 + Y**2
+        r3 = (rho2 + Z**2)**(3/2)
+        return r3 / rho2
+
+    @staticmethod
+    def Beq_dipole(X: np.ndarray, Y: np.ndarray, Z: np.ndarray, m: float) -> np.ndarray:
+        with np.errstate(divide="ignore", invalid="ignore"):
+            L = DipoleField.__L_dipole(X, Y, Z)
+            Beq = m / L**3
+        return Beq
+
+    @staticmethod
+    def Bion_dipole(X: np.ndarray, Y: np.ndarray, Z: np.ndarray, m: float) -> np.ndarray:
+        # calculates footprint assuming intersection with ellipsoid of height 500 km above Jupiter
+        a = 1; c = RJ_polar_ratio; h = 500 / RJ
+        b = (c+h)**2 - (a+h)**2
+        with np.errstate(divide="ignore", invalid="ignore"):
+            L = DipoleField.__L_dipole(X, Y, Z)
+            sin2th = (-b + np.sqrt(b**2 + 4 * L**2 * (c+h)**2)) / (2 * L**2)
+            Bion = m / L**3 * np.sqrt(4 - 3 * sin2th) / sin2th**3
+        return Bion
 
 
 def alpha(r_b: np.ndarray, B: np.ndarray) -> np.ndarray:
@@ -198,45 +240,3 @@ def alpha_eq(alpha: np.ndarray, Beq: np.ndarray, B: np.ndarray) -> np.ndarray:
     clip_mask = np.abs(inner) < 1.1
     inner[clip_mask] = np.clip(inner[clip_mask], a_min=-1, a_max=1)
     return np.asin(inner)
-
-
-def B_dipole(X: np.ndarray, Y: np.ndarray, Z: np.ndarray, m: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    rho2 = X**2 + Y**2
-    r2 = rho2 + Z**2
-
-    with np.errstate(divide="ignore", invalid="ignore"):
-        r = np.sqrt(r2)
-        r5 = r2**2 * r
-        Bx = 3 * m * X * Z / r5
-        By = 3 * m * Y * Z / r5
-        Bz = m * (3 * Z**2 - r2) / r5
-
-    mask = X**2 + Y**2 + (Z / RJ_polar_ratio)**2 < 1
-    Bx[mask] = np.nan
-    By[mask] = np.nan
-    Bz[mask] = np.nan
-    return Bx, By, Bz
-
-
-def L_dipole(X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> np.ndarray:
-    rho2 = X**2 + Y**2
-    r3 = (rho2 + Z**2)**(3/2)
-    return r3 / rho2
-
-
-def Beq_dipole(X: np.ndarray, Y: np.ndarray, Z: np.ndarray, m: float) -> np.ndarray:
-    with np.errstate(divide="ignore", invalid="ignore"):
-        L = L_dipole(X, Y, Z)
-        Beq = m / L**3
-    return Beq
-
-
-def Bion_dipole(X: np.ndarray, Y: np.ndarray, Z: np.ndarray, m: float) -> np.ndarray:
-    # calculates footprint assuming intersection with ellipsoid of height 500 km above Jupiter
-    a = 1; c = RJ_polar_ratio; h = 500 / RJ
-    b = (c+h)**2 - (a+h)**2
-    with np.errstate(divide="ignore", invalid="ignore"):
-        L = L_dipole(X, Y, Z)
-        sin2th = (-b + np.sqrt(b**2 + 4 * L**2 * (c+h)**2)) / (2 * L**2)
-        Bion = m / L**3 * np.sqrt(4 - 3 * sin2th) / sin2th**3
-    return Bion
