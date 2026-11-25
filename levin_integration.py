@@ -4,7 +4,7 @@ from numpy.linalg import norm
 import pandas as pd
 
 # local files
-from global_vars import ONE_D_NDArray, TWO_D_NDArray, THREE_D_NDArray, CHS, NU_O, process_ch_inputs, MJ
+from global_vars import ONE_D_NDArray, TWO_D_NDArray, THREE_D_NDArray, CHS, NU_O, process_ch_inputs, MJ, RJ_polar_ratio
 from mshell_map import mshell_argparser, make_Rlos
 from bessel_functions import F, F_p, approxF
 from banana_slug import banana_argparser, banana_plot
@@ -50,6 +50,20 @@ def gamma(E: np.ndarray) -> np.ndarray:
     E in MeV
     """
     return E / 0.511 + 1
+
+
+def truncate_rlos(r_los: THREE_D_NDArray) -> THREE_D_NDArray:
+    """
+    Replaces Jupiter intersections and anything after with the last valid coordinate so remaining integrals are 0.
+    Note r_los represents a line of sight, so distance from S/C is strictly increasing along axis 1
+    """
+    jupiter_mask = r_los[..., 0]**2 + r_los[..., 1]**2 + (r_los[..., 2] / RJ_polar_ratio)**2 < 1
+    jupiter_occlusion_mask = np.logical_and.accumulate(~jupiter_mask, axis=1)   # everything before jupiter intersection is valid
+    # fill array with increasing indices until hit jupiter, then 0
+    valid_los_indices = np.where(jupiter_occlusion_mask, np.arange(r_los.shape[1])[None, :], 0)
+    # propagate last valid los index along rest of los
+    last_valid_index = np.maximum.accumulate(valid_los_indices, axis=1)
+    return np.take_along_axis(r_los, last_valid_index[..., None], axis=1)
 
 
 def N(alpha: TWO_D_NDArray, B_Gauss: TWO_D_NDArray, Beq_Gauss: TWO_D_NDArray, E_range: ONE_D_NDArray) -> THREE_D_NDArray:
@@ -112,6 +126,7 @@ def T(I_C: TWO_D_NDArray, CH: CHS) -> TWO_D_NDArray:
 
 
 def los_integrate(r_los: THREE_D_NDArray, r_b: TWO_D_NDArray, BF: BField, E_range: ONE_D_NDArray, s_range: ONE_D_NDArray, CH: CHS) -> ONE_D_NDArray:
+    r_los = truncate_rlos(r_los)
     B_los = BF.B(r_los) * nT_to_Gauss
     B_los_norm = norm(B_los, axis=-1)
     Beq_los_norm = BF.Beq(r_los) * nT_to_Gauss

@@ -142,15 +142,19 @@ def generate_Bfield_mesh(M_max: float, N: float, max_workers: int):
     n_splits *= 2                                           # be more conservative since extra memory could be used by TraceField object
     print("Tracing field...")
     footprint_data = tracefield_chunked(X, Y, Z, n_splits, max_workers)    # these positions are SIII! --- eq_data is domain x (x3, y3, z3, M, lon) along last axis, lon in radians
+    print("Computing footprints")
     B_mesh_eq = norm(B(footprint_data[..., IDX.XEQ], footprint_data[..., IDX.YEQ], footprint_data[..., IDX.ZEQ]), axis=-1)
     B_mesh_in = norm(B(footprint_data[..., IDX.XIN], footprint_data[..., IDX.YIN], footprint_data[..., IDX.ZIN]), axis=-1)
     B_mesh_is = norm(B(footprint_data[..., IDX.XIS], footprint_data[..., IDX.YIS], footprint_data[..., IDX.ZIS]), axis=-1)
+    print("Finalizing")
     Mshell = footprint_data[..., IDX.MSH]
     dipole_xy = np.stack((footprint_data[..., IDX.XEM], footprint_data[..., IDX.YEM]), axis=-1)     # dipole_lon is dicontinuous and not interpolatable
 
-    jupiter_mask = X**2 + Y**2 + (Z / RJ_polar_ratio)**2 < 1
+    jupiter_mask = X**2 + Y**2 + (Z / RJ_polar_ratio)**2 < 0.75     # not sure how JupiterMag treats interior of Jupiter, so avoid storing
     B_mesh[jupiter_mask, :] = np.nan
-    B_mesh_eq[jupiter_mask, :] = np.nan
+    B_mesh_eq[jupiter_mask] = np.nan
+    B_mesh_in[jupiter_mask] = np.nan
+    B_mesh_is[jupiter_mask] = np.nan
     Mshell[jupiter_mask] = np.nan
     dipole_xy[jupiter_mask, :] = np.nan
 
