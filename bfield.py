@@ -185,7 +185,7 @@ class DipoleField(BField):
             By = 3 * m * Y * Z / r5
             Bz = m * (3 * Z**2 - r2) / r5
 
-        mask = X**2 + Y**2 + (Z / RJ_polar_ratio)**2 < 1
+        mask = X**2 + Y**2 + (Z / RJ_polar_ratio)**2 < 0.75
         Bx[mask] = np.nan
         By[mask] = np.nan
         Bz[mask] = np.nan
