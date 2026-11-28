@@ -15,7 +15,7 @@ import argparse
 from typing import Optional
 from pathlib import Path
 
-PJ_dspr = np.array([[1, 307]])
+PJ_DSPR = {1: 307, 23: 301, 25: 301}
 IM_PATH = "images/banana"
 Path(IM_PATH).mkdir(parents=True, exist_ok=True)
 
@@ -151,7 +151,8 @@ def main():
     chs = process_ch_inputs(args.ch)
 
     IRDR_data_pj, GRDR_data_pj = load_PJ_data(args.PJ, args.dt, chs)
-    banana_plot(IRDR_data_pj, GRDR_data_pj, args.dspr, f"PJs{args.PJ}_CHs{args.ch}_dt{args.dt}", args.type)
+    dspr = PJ_DSPR.get(args.PJ, args.dspr)
+    banana_plot(IRDR_data_pj, GRDR_data_pj, dspr, f"PJs{args.PJ}_CHs{args.ch}_dt{args.dt}", args.type)
 
 
 if __name__ == "__main__":
