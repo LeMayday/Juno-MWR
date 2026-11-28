@@ -77,6 +77,7 @@ def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame, samples_
     fig = plt.figure(figsize=(12,8))
     axes = make_subplots(fig, len(IRDR_data_pj.columns[2:]))
     for i, ch in enumerate(IRDR_data_pj.columns[2:]):   # skip time columns
+        CH = CHS[ch]    # chs in IRDR_data_pj column headers should be the enums exactly
         data = IRDR_data_pj[ch].to_numpy()
         num_spins = data.size // samples_per_rot
         data = data[:(num_spins * samples_per_rot)]     # need to truncate data to integer # of rotations
@@ -87,8 +88,8 @@ def banana_plot(IRDR_data_pj: pd.DataFrame, GRDR_data_pj: pd.DataFrame, samples_
             im = axes[i].imshow(data_folded, cmap='gist_ncar', aspect='auto', origin='lower')
         fig.colorbar(im, ax=axes[i])
         # note ch is "Ch{i}"
-        add_contours(axes[i], int(ch[2]), GRDR_data_pj, samples_per_rot, num_spins, overlay_type)
-        axes[i].set_title(ch)
+        add_contours(axes[i], CH, GRDR_data_pj, samples_per_rot, num_spins, overlay_type)
+        axes[i].set_title(CH.name)
     fig.tight_layout()
     fig.savefig(f"{IM_PATH}/MWR_banana_{params_str}_{overlay_type}.png", dpi=300)
 
