@@ -82,7 +82,7 @@ def N(alpha: TWO_D_NDArray, B_Gauss: TWO_D_NDArray, Beq_Gauss: TWO_D_NDArray, E_
     L = (MJ / Beq_Gauss)**(1/3)                     # eqn 9 --- num samples x num LOS pts
     mp = table1_lookup(L)                           # model params
     n_ea = mp[..., 2] * np.sin(a_eq)**(mp[..., 0]) + mp[..., 3] * np.sin(a_eq)**(mp[..., 1])        # eqn 10 --- num samples x num LOS pts
-    n_eE = E0 / ( E0 + ( E_range[None, None, :] / np.sqrt(B_Gauss)[:, :, None] )**(EPS + 0.75) )    # eqn 11 --- num samples x num LOS pts x num E pts
+    n_eE = E0 / ( E0 + ( E_range[None, None, :] / np.sqrt(Beq_Gauss)[:, :, None] )**(EPS + 0.75) )  # eqn 11 --- num samples x num LOS pts x num E pts
     return n_ea[:, :, None] * n_eE
 
 
